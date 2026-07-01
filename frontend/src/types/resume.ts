@@ -6,6 +6,8 @@ export interface ResumeItem {
   resume_data: ResumeData
   template_id: string
   template_config: TemplateConfig
+  create_time?: string
+  update_time?: string
 }
 
 export interface TemplateConfig {
@@ -18,6 +20,7 @@ export interface TemplateConfig {
   title_font_color: string
   body_font_size: number
   body_font_color: string
+  bg_color: string
   icon_color: string
   header_icon_color: string
   line_height: number
@@ -31,6 +34,7 @@ export interface TemplateConfig {
   section_margin_bottom: number
   section_title_margin_bottom: number
   show_avatar: boolean
+  avatar_position: "left" | "center" | "right"
 }
 
 export interface ResumeData {
@@ -46,5 +50,11 @@ export interface ResumeData {
     section_order: string[]
     hidden_sections: string[]
     section_titles: Record<string, string>
+    field_labels?: Record<string, Record<string, string>>
+    language_locked?: boolean
+    skills_options?: {
+      show_keywords: boolean
+      description_inline: boolean
+    }
   }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, ref, watch } from "vue"
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue"
 import type { PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist/legacy/build/pdf.mjs"
 
 type PdfJsModule = typeof import("pdfjs-dist/legacy/build/pdf.mjs")
@@ -22,6 +22,8 @@ let dragStartX = 0
 let dragStartY = 0
 let dragStartScrollLeft = 0
 let dragStartScrollTop = 0
+let scrollerResizeObserver: ResizeObserver | null = null
+let lastScrollerWidth = 0
 
 function loadPdfjs() {
   if (!pdfjsPromise) {
@@ -68,8 +70,9 @@ function stopDrag(event: PointerEvent) {
 
 async function centerHorizontal() {
   await nextTick()
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
   const el = scroller.value
-  if (!el) return
+  if (!el || el.clientWidth <= 0) return
   el.scrollLeft = Math.max((el.scrollWidth - el.clientWidth) / 2, 0)
 }
 
@@ -165,8 +168,20 @@ watch(
   },
 )
 
+onMounted(() => {
+  scrollerResizeObserver = new ResizeObserver(() => {
+    const width = scroller.value?.clientWidth || 0
+    if (width > 0 && width !== lastScrollerWidth) {
+      lastScrollerWidth = width
+      void centerHorizontal()
+    }
+  })
+  if (scroller.value) scrollerResizeObserver.observe(scroller.value)
+})
+
 onBeforeUnmount(() => {
   loadSeq += 1
+  scrollerResizeObserver?.disconnect()
   void destroyCurrentPdf()
 })
 </script>

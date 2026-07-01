@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -8,7 +9,7 @@ from pydantic import BaseModel, Field
 def default_resume_data() -> dict[str, Any]:
     return {
         "basics": {
-            "name": "张三",
+            "name": "Elliot",
             "title": "AI 应用开发工程师",
             "status": "应届生",
             "phone": "13800000000",
@@ -71,7 +72,7 @@ def default_resume_data() -> dict[str, Any]:
                 "description": "面向求职者的在线简历编辑、AI 优化与多格式导出系统。",
                 "highlights": [
                     "设计基于 JSON 的简历数据结构，支持模块排序、隐藏、重命名和模板配置持久化。",
-                    "实现后端 Jinja2 HTML 预览与 WeasyPrint PDF 导出共用模板，提升预览和导出一致性。",
+                    "实现后端 Jinja2 HTML 预览与 PlayWright 导出共用模板，提升预览和导出一致性。",
                 ],
             }
         ],
@@ -80,6 +81,8 @@ def default_resume_data() -> dict[str, Any]:
         "layout": {
             "section_order": ["basics", "summary", "education", "skills", "work", "projects", "awards"],
             "hidden_sections": [],
+            "skills_options": {"show_keywords": True, "description_inline": False},
+            "field_labels": {},
             "section_titles": {
                 "basics": "基本信息",
                 "summary": "个人简介",
@@ -94,9 +97,25 @@ def default_resume_data() -> dict[str, Any]:
 
 
 def default_template_config(template_id: str = "tech") -> dict[str, Any]:
+    defaults = {
+        "classic": {"theme_color": "#2563eb", "bg_color": "#ffffff", "icon_color": "#2563eb"},
+        "tech": {"theme_color": "#2563eb", "bg_color": "#ffffff", "icon_color": "#2563eb"},
+        "modern": {"theme_color": "#0f766e", "bg_color": "#ffffff", "icon_color": "#ffffff"},
+        "blue_timeline": {"theme_color": "#4673f4", "bg_color": "#ffffff", "icon_color": "#ffffff"},
+        "minimal_light": {"theme_color": "#333333", "bg_color": "#ffffff", "icon_color": "#333333"},
+        "minimal_mono": {"theme_color": "#000000", "bg_color": "#ffffff", "icon_color": "#6b7280"},
+        "modern_clean": {"theme_color": "#0f766e", "bg_color": "#ffffff", "icon_color": "#0f766e"},
+        "elegant_line": {"theme_color": "#111827", "bg_color": "#ffffff", "icon_color": "#111827"},
+        "editorial_serif": {"theme_color": "#8f2d3b", "bg_color": "#ffffff", "icon_color": "#8f2d3b"},
+        "executive_panel": {"theme_color": "#1f3a5f", "bg_color": "#ffffff", "icon_color": "#ffffff"},
+        "portfolio_cards": {"theme_color": "#2f855a", "bg_color": "#ffffff", "icon_color": "#2f855a"},
+        "compact_matrix": {"theme_color": "#475569", "bg_color": "#ffffff", "icon_color": "#475569"},
+    }
+    cfg = defaults.get(template_id, {"theme_color": "#2563eb", "bg_color": "#ffffff", "icon_color": "#2563eb"})
     return {
         "template_id": template_id,
-        "theme_color": "#2563eb",
+        "theme_color": cfg["theme_color"],
+        "bg_color": cfg["bg_color"],
         "font_family": "vf-sans",
         "name_font_size": 28,
         "name_font_color": "#111827",
@@ -104,8 +123,8 @@ def default_template_config(template_id: str = "tech") -> dict[str, Any]:
         "title_font_color": "#111827",
         "body_font_size": 13,
         "body_font_color": "#374151",
-        "icon_color": "#2563eb",
-        "header_icon_color": "#ffffff",
+        "icon_color": cfg["icon_color"],
+        "header_icon_color": cfg["icon_color"],
         "line_height": 1.6,
         "page_margin_top": 14,
         "page_margin_right": 16,
@@ -117,6 +136,7 @@ def default_template_config(template_id: str = "tech") -> dict[str, Any]:
         "section_margin_bottom": 10,
         "section_title_margin_bottom": 6,
         "show_avatar": True,
+        "avatar_position": "right",
     }
 
 
@@ -140,6 +160,14 @@ class ResumeVersionCreate(BaseModel):
     reason: str = "手动保存版本"
 
 
+class ResumeShareUpdate(BaseModel):
+    enabled: bool
+    expire_time: Optional[datetime] = None
+    regenerate_token: bool = False
+    mask_sensitive: bool = False
+    custom_token: Optional[str] = None
+
+
 class ResumeOut(BaseModel):
     id: int
     user_id: int
@@ -148,5 +176,7 @@ class ResumeOut(BaseModel):
     resume_data: dict[str, Any]
     template_id: str
     template_config: dict[str, Any]
+    create_time: Optional[datetime] = None
+    update_time: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

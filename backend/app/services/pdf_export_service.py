@@ -23,7 +23,7 @@ PDF_DEPENDENCY_MESSAGE = (
     "PDF preview/export requires WeasyPrint system libraries. "
     "Please install pango, cairo, gdk-pixbuf and related font libraries on the server."
 )
-PDF_CACHE_VERSION = "2026-06-18-2"
+PDF_CACHE_VERSION = "2026-06-27-1"
 PDF_RESOURCE_TIMEOUT = 3
 _pdf_locks: dict[str, Lock] = {}
 _pdf_locks_guard = Lock()
@@ -90,8 +90,8 @@ PAGINATION_SCRIPT = r"""
       '.timeline-sub',
       '.timeline-tech',
       '.tag-row',
-      '.markdown-body p',
-      '.markdown-body li'
+      '.rich-text-body p',
+      '.rich-text-body li'
     ].join(',');
     const targets = Array.prototype.slice.call(document.querySelectorAll(selector));
     targets.forEach((el) => { el.style.marginTop = ''; });
@@ -196,6 +196,29 @@ PAGED_EXPORT_SCRIPT = r"""
       if (style.display === 'none' || style.visibility === 'hidden') return;
       contentBottom = Math.max(contentBottom, rect.bottom - pageRect.top);
     });
+
+    // Capture direct rich-text nodes without treating grid borders, wrapper
+    // padding or other structural overflow as printable page content.
+    const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT);
+    let textNode = walker.nextNode();
+    while (textNode) {
+      if (textNode.textContent && textNode.textContent.trim()) {
+        const parent = textNode.parentElement;
+        const style = parent ? getComputedStyle(parent) : null;
+        if (!style || (style.display !== 'none' && style.visibility !== 'hidden')) {
+          const range = document.createRange();
+          range.selectNodeContents(textNode);
+          Array.from(range.getClientRects()).forEach((rect) => {
+            if (rect.width > 0 && rect.height > 0) {
+              contentBottom = Math.max(contentBottom, rect.bottom - pageRect.top);
+            }
+          });
+          range.detach();
+        }
+      }
+      textNode = walker.nextNode();
+    }
+
     return Math.max(contentBottom, 0) + metrics.firstBottom;
   }
 
@@ -367,6 +390,7 @@ def _pdf_fingerprint(resume: Resume, renderer: str) -> str:
         "renderer_name": renderer,
         "renderer": _renderer_signature(),
         "resume_data": resume.resume_data,
+        "language": resume.language,
         "template_config": resume.template_config,
         "template_id": resume.template_id,
         "weasyprint_version": _package_version("weasyprint"),
@@ -476,7 +500,7 @@ def get_pdf_path(resume: Resume) -> Path:
             if file_path.exists() and file_path.stat().st_size > 0:
                 return file_path
 
-        html = render_resume_html(resume.resume_data, resume.template_id, resume.template_config)
+        html = render_resume_html(resume.resume_data, resume.template_id, resume.template_config, resume.language)
         errors = []
         for renderer, file_path in candidates:
             tmp_path = file_path.with_suffix(f".{uuid4().hex}.tmp")

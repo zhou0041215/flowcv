@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue"
-import { Sparkles, CheckCircle2, Bot, Target, ScanLine } from "lucide-vue-next"
+import { computed, onBeforeUnmount, ref, watch } from "vue"
+import { Sparkles, CheckCircle2, Bot, FileSearch, ScanLine, Languages } from "lucide-vue-next"
 
 const props = defineProps<{ title?: string; description?: string; streamText?: string }>()
 
@@ -36,6 +36,12 @@ const stageCatalog: Record<string, Stage[]> = {
     { label: "润色表达与关键词", patterns: ["keywords", "highlights", "description", "content"] },
     { label: "整理可写入内容", patterns: ["changes", "suggestions", "optimized_section"] },
   ],
+  translate: [
+    { label: "读取并分析原简历结构", patterns: ["parsing", "source_language"] },
+    { label: "全文多语种对照翻译", patterns: ["translating", "target_language"] },
+    { label: "保护实体与专业术语", patterns: ["preserving", "entities"] },
+    { label: "重构页面布局与格式", patterns: ["formatting", "layout"] },
+  ],
 }
 
 const mode = computed<string>(() => {
@@ -44,25 +50,51 @@ const mode = computed<string>(() => {
   if (title.includes("评分")) return "score"
   if (title.includes("JD")) return "jd"
   if (title.includes("润色")) return "section"
+  if (title.includes("翻译")) return "translate"
   if (title.includes("打磨")) return "chat"
   return "generate"
 })
 
 const stages = computed(() => stageCatalog[mode.value] || stageCatalog.generate)
+const elapsedIndex = ref(0)
+let timer: ReturnType<typeof window.setInterval> | null = null
+
+function stopTimer() {
+  if (timer) window.clearInterval(timer)
+  timer = null
+}
+
+function startTimer() {
+  stopTimer()
+  elapsedIndex.value = 0
+  timer = window.setInterval(() => {
+    const maxIndex = Math.max(0, stages.value.length - 2)
+    elapsedIndex.value = Math.min(maxIndex, elapsedIndex.value + 1)
+    if (elapsedIndex.value >= maxIndex) stopTimer()
+  }, 4200)
+}
+
+watch(
+  () => [props.title, stages.value.length],
+  () => startTimer(),
+  { immediate: true },
+)
+
+onBeforeUnmount(stopTimer)
 
 const activeIndex = computed(() => {
   const text = props.streamText || ""
-  if (!text) return 0
-  let index = 0
+  let index = elapsedIndex.value
   stages.value.forEach((stage, stageIndex) => {
     if (stage.patterns.some((pattern) => text.includes(pattern))) index = Math.max(index, stageIndex)
   })
-  return index
+  return Math.min(index, stages.value.length - 1)
 })
 
 const progress = computed(() => {
-  if (!props.streamText) return 12
-  return Math.min(96, Math.max(18, Math.round(((activeIndex.value + 1) / stages.value.length) * 100)))
+  const stepProgress = Math.round(((activeIndex.value + 1) / stages.value.length) * 88)
+  const extra = props.streamText ? 8 : 0
+  return Math.min(96, Math.max(12, stepProgress + extra))
 })
 
 const currentActivity = computed(() => {
@@ -71,16 +103,17 @@ const currentActivity = computed(() => {
 })
 
 const IconComponent = computed(() => {
-  if (mode.value === 'jd') return Target
+  if (mode.value === 'jd') return FileSearch
   if (mode.value === 'score') return ScanLine
   if (mode.value === 'chat') return Bot
+  if (mode.value === 'translate') return Languages
   return Sparkles
 })
 </script>
 
 <template>
-  <div class="diagnosis-loading flex flex-col justify-center py-4 w-full">
-    <div class="relative w-full mx-auto">
+  <div class="diagnosis-loading flex flex-col justify-center py-1 sm:py-2 w-full">
+    <div class="relative w-full max-w-md mx-auto">
       <div class="relative z-10 flex flex-col">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
@@ -97,10 +130,10 @@ const IconComponent = computed(() => {
           </div>
         </div>
 
-        <p v-if="description" class="mt-4 text-[14px] leading-relaxed text-zinc-500">{{ description }}</p>
+        <p v-if="description" class="mt-3 text-[13px] sm:text-[14px] leading-relaxed text-zinc-500">{{ description }}</p>
 
-        <div class="mt-6 flex-1 space-y-3">
-          <div v-for="(item, index) in stages" :key="item.label" class="analysis-step flex items-center gap-4 rounded-[16px] px-4 py-3.5 transition-colors duration-500" :class="index <= activeIndex ? 'bg-zinc-50 ring-1 ring-zinc-100 shadow-sm' : 'bg-transparent'">
+        <div class="mt-4 flex-1 space-y-2.5">
+          <div v-for="(item, index) in stages" :key="item.label" class="analysis-step flex items-center gap-3.5 rounded-[16px] px-4 py-2.5 sm:py-3 transition-colors duration-500" :class="index <= activeIndex ? 'bg-zinc-50 ring-1 ring-zinc-100 shadow-sm' : 'bg-transparent'">
             <span class="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold transition-all duration-500 shrink-0" :class="index < activeIndex ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' : index === activeIndex ? 'bg-zinc-900 text-white shadow-md shadow-zinc-900/20' : 'bg-white text-zinc-400 ring-1 ring-zinc-200'">
               <CheckCircle2 v-if="index < activeIndex" class="h-4 w-4" />
               <span v-else>{{ index + 1 }}</span>
@@ -115,7 +148,7 @@ const IconComponent = computed(() => {
           </div>
         </div>
         
-        <div class="mt-8 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/50">
+        <div class="mt-6 h-1.5 w-full overflow-hidden rounded-full bg-zinc-200/50">
           <div class="h-full rounded-full bg-blue-500 transition-all duration-700 ease-out" :style="{ width: `${progress}%` }"></div>
         </div>
       </div>

@@ -1,7 +1,10 @@
 export type DiffKind = "added" | "modified" | "removed"
 
 export interface DiffItem {
+  id: string
   kind: DiffKind
+  sectionKey: string
+  entryKey: string
   title: string
   before?: string
   after?: string
@@ -30,7 +33,7 @@ const builtInTitles: Record<string, string> = {
   awards: "荣誉奖项",
 }
 
-const ignoredKeys = new Set(["id", "avatar", "field_config", "layout", "custom_fields"])
+const ignoredKeys = new Set(["id", "avatar", "field_config", "layout", "custom_fields", "preset_type"])
 const fieldOrder = [
   "name",
   "title",
@@ -46,11 +49,21 @@ const fieldOrder = [
   "major",
   "degree",
   "company",
+  "organization",
+  "institution",
+  "issuer",
+  "publisher",
+  "platform",
   "position",
   "role",
+  "level",
+  "score",
+  "award",
   "start_date",
   "end_date",
   "date",
+  "credential_id",
+  "url",
   "tech_stack",
   "keywords",
   "description",
@@ -79,12 +92,23 @@ const fieldLabels: Record<string, string> = {
   website: "个人网站",
   github: "代码仓库",
   expected_salary: "期望薪资",
+  custom_sections: "自定义模块",
   company: "公司",
+  organization: "组织",
+  institution: "机构",
+  issuer: "颁发机构",
+  publisher: "期刊/专利号/会议",
+  platform: "平台",
   position: "职位",
   role: "角色",
+  level: "水平",
+  score: "成绩",
+  award: "奖项",
   school: "学校",
   major: "专业",
   degree: "学历",
+  credential_id: "证书编号",
+  url: "链接",
   start_date: "开始时间",
   end_date: "结束时间",
   date: "时间",
@@ -96,7 +120,12 @@ const fieldLabels: Record<string, string> = {
 }
 
 function compact(value: unknown): string {
-  return String(value ?? "").trim()
+  const text = String(value ?? "")
+  if (!/<[a-z][\s\S]*>/i.test(text)) return text.trim()
+  const doc = new DOMParser().parseFromString(text, "text/html")
+  doc.body.querySelectorAll("br").forEach((node) => node.replaceWith("\n"))
+  doc.body.querySelectorAll("p,div,li,blockquote,h1,h2,h3,h4").forEach((node) => node.append("\n"))
+  return (doc.body.textContent || "").replace(/\n{3,}/g, "\n\n").trim()
 }
 
 function splitTagText(value: unknown) {
@@ -222,11 +251,11 @@ function compareFieldValue(key: string, value: unknown) {
 }
 
 function itemTitle(item: any, index: number, fallback: string) {
-  return compact(item?.name || item?.company || item?.school || item?.title || item?.position || item?.role) || `${fallback} ${index + 1}`
+  return compact(item?.name || item?.company || item?.organization || item?.school || item?.title || item?.position || item?.role || item?.publisher || item?.platform) || `${fallback} ${index + 1}`
 }
 
 function itemKey(item: any, index: number) {
-  const identity = compact(item?.id || item?.name || item?.company || item?.school || item?.title || item?.position || item?.role)
+  const identity = compact(item?.id || item?.name || item?.company || item?.organization || item?.school || item?.title || item?.position || item?.role || item?.publisher || item?.platform)
   return identity || `item_${index}`
 }
 
@@ -271,6 +300,84 @@ function toEntries(sectionKey: string, value: any, fallbackTitle: string): Compa
   return text ? [{ key: sectionKey, title: fallbackTitle, text, compareText: compareValue(value) }] : []
 }
 
+function cloneData<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value ?? null))
+}
+
+function entryMatches(item: any, key: string, index: number) {
+  return itemKey(item, index) === key
+}
+
+function replaceListEntry(current: any[], next: any[], entryKey: string, kind: DiffKind) {
+  if (kind === "removed") return current.filter((item, index) => !entryMatches(item, entryKey, index))
+  const nextItem = next.find((item, index) => entryMatches(item, entryKey, index))
+  if (!nextItem) return current
+  const currentIndex = current.findIndex((item, index) => entryMatches(item, entryKey, index))
+  if (currentIndex === -1) return [...current, cloneData(nextItem)]
+  const result = [...current]
+  result[currentIndex] = cloneData(nextItem)
+  return result
+}
+
+function setSectionValue(data: any, sectionKey: string, value: any) {
+  if (Object.prototype.hasOwnProperty.call(data, sectionKey) || builtInTitles[sectionKey]) {
+    data[sectionKey] = value
+    return
+  }
+  const index = (data.custom_sections || []).findIndex((item: any) => item.id === sectionKey)
+  if (index >= 0) data.custom_sections[index] = value
+}
+
+export function buildSelectedResumeData(currentData: any, optimizedData: any, selectedIds: string[], sections: SectionDiff[]) {
+  const selected = new Set(selectedIds)
+  const result = cloneData(currentData || {})
+  const next = cloneData(optimizedData || {})
+
+  sections.forEach((section) => {
+    section.changes.forEach((change) => {
+      if (!selected.has(change.id)) return
+      const currentValue = sectionValue(result, section.key)
+      const nextValue = sectionValue(next, section.key)
+      if (Array.isArray(currentValue) || Array.isArray(nextValue)) {
+        setSectionValue(
+          result,
+          section.key,
+          replaceListEntry(currentValue || [], nextValue || [], change.entryKey, change.kind),
+        )
+        return
+      }
+      if (
+        currentValue &&
+        nextValue &&
+        typeof currentValue === "object" &&
+        typeof nextValue === "object" &&
+        Array.isArray(currentValue.items) &&
+        Array.isArray(nextValue.items)
+      ) {
+        setSectionValue(result, section.key, {
+          ...currentValue,
+          ...nextValue,
+          items: replaceListEntry(currentValue.items, nextValue.items, change.entryKey, change.kind),
+        })
+        return
+      }
+      if (change.kind === "removed") {
+        setSectionValue(result, section.key, undefined)
+      } else {
+        setSectionValue(result, section.key, cloneData(nextValue))
+      }
+    })
+  })
+
+  if (next.layout) {
+    result.layout = {
+      ...(result.layout || {}),
+      ...next.layout,
+    }
+  }
+  return result
+}
+
 export function diffSection(sectionKey: string, currentValue: any, nextValue: any, title = builtInTitles[sectionKey] || "当前模块"): DiffItem[] {
   const currentEntries = toEntries(sectionKey, currentValue, title)
   const nextEntries = toEntries(sectionKey, nextValue, title)
@@ -281,16 +388,16 @@ export function diffSection(sectionKey: string, currentValue: any, nextValue: an
   nextEntries.forEach((item) => {
     const before = currentMap.get(item.key)
     if (!before) {
-      changes.push({ kind: "added", title: item.title, after: item.text })
+      changes.push({ id: `${sectionKey}:${item.key}:added`, kind: "added", sectionKey, entryKey: item.key, title: item.title, after: item.text })
       return
     }
     if (before.compareText !== item.compareText) {
-      changes.push({ kind: "modified", title: item.title, before: before.text, after: item.text })
+      changes.push({ id: `${sectionKey}:${item.key}:modified`, kind: "modified", sectionKey, entryKey: item.key, title: item.title, before: before.text, after: item.text })
     }
   })
 
   currentEntries.forEach((item) => {
-    if (!nextMap.has(item.key)) changes.push({ kind: "removed", title: item.title, before: item.text })
+    if (!nextMap.has(item.key)) changes.push({ id: `${sectionKey}:${item.key}:removed`, kind: "removed", sectionKey, entryKey: item.key, title: item.title, before: item.text })
   })
 
   return changes

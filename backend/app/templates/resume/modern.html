@@ -1,6 +1,6 @@
 {% from 'resume/partials/section.html' import render_section %}
 <!doctype html>
-<html lang="zh-CN">
+<html lang="{{ resume._language }}">
 <head>
   <meta charset="utf-8">
   <style>
@@ -42,6 +42,19 @@
       border-radius: 0;
       background: white;
       object-fit: cover;
+    }
+    .modern-template .resume-avatar-left {
+      justify-content: flex-start;
+      align-items: center;
+      gap: 10mm;
+    }
+    .modern-template .resume-avatar-left .resume-avatar-cell {
+      width: auto;
+      padding: 0;
+      text-align: left;
+    }
+    .modern-template .resume-avatar-left .resume-header-main {
+      flex: 1;
     }
     .modern-template .resume-name,
     .modern-template .resume-position,
@@ -103,7 +116,7 @@
     @media print {
       .modern-template .section,
       .modern-template .experience-item,
-      .modern-template .markdown-body li {
+      .modern-template .rich-text-body li {
         break-inside: auto !important;
         page-break-inside: auto !important;
       }
@@ -112,21 +125,21 @@
 </head>
 <body>
   <main class="resume-page modern-template">
-    {% set basics_icon_color = config.header_icon_color or '#ffffff' %}
+    {% set basics_icon_color = config.header_icon_color or config.icon_color or '#ffffff' %}
     {% if 'basics' not in (resume.layout.hidden_sections or []) %}
       {% include 'resume/partials/basics.html' %}
     {% endif %}
     <div class="modern-body">
       <aside class="modern-column modern-sidebar">
         {% for section in resume._sections %}
-          {% if section.key in ['summary', 'education', 'skills', 'awards'] or section.key.startswith('custom_') %}
+          {% if section.key in ['summary', 'education', 'skills', 'awards'] %}
             {{ render_section(section, resume) }}
           {% endif %}
         {% endfor %}
       </aside>
       <section class="modern-column modern-main">
         {% for section in resume._sections %}
-          {% if section.key in ['work', 'projects'] %}
+          {% if section.key in ['work', 'projects'] or section.key.startswith('custom_') %}
             {{ render_section(section, resume) }}
           {% endif %}
         {% endfor %}

@@ -1,16 +1,64 @@
 @import "tailwindcss";
 @source "../**/*.{vue,ts}";
 
-* { box-sizing: border-box; }
-body {
+* { 
+  box-sizing: border-box; 
+  --removed-body-scroll-bar-size: 0px !important;
+}
+html { overflow-y: scroll; }
+body, html body, html body[style] {
   margin: 0;
+  padding-right: 0 !important;
   color: #111827;
   background: #f7f8fb;
+  overflow: visible !important;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
 }
 a { color: inherit; text-decoration: none; }
 .thin-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 .thin-scrollbar::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 999px; }
+
+/* 全局富文本编辑器及展示内容样式重置（绝对强制，抵抗 Tailwind v4 preflight 样式重置） */
+.rich-text-editor ul, .announcement-content ul, .history-announcement-content ul, .ai-records-hint ul {
+  list-style: disc !important;
+  list-style-type: disc !important;
+  margin: 0.6em 0 !important;
+  padding-left: 2rem !important;
+}
+.rich-text-editor ol, .announcement-content ol, .history-announcement-content ol, .ai-records-hint ol {
+  list-style: decimal !important;
+  list-style-type: decimal !important;
+  margin: 0.6em 0 !important;
+  padding-left: 2rem !important;
+}
+.rich-text-editor li, .announcement-content li, .history-announcement-content li, .ai-records-hint li {
+  display: list-item !important;
+  list-style-position: outside !important;
+  margin-bottom: 0.2em !important;
+}
+.rich-text-editor s, .rich-text-editor strike, .rich-text-editor del, .rich-text-editor span[style*="line-through"],
+.announcement-content s, .announcement-content strike, .announcement-content del, .announcement-content span[style*="line-through"],
+.history-announcement-content s, .history-announcement-content strike, .history-announcement-content del, .history-announcement-content span[style*="line-through"],
+.ai-records-hint s, .ai-records-hint strike, .ai-records-hint del, .ai-records-hint span[style*="line-through"] {
+  text-decoration: line-through !important;
+  text-decoration-line: line-through !important;
+}
+.rich-text-editor u, .announcement-content u, .history-announcement-content u, .ai-records-hint u {
+  text-decoration: underline !important;
+}
+.rich-text-editor b, .rich-text-editor strong, .announcement-content b, .announcement-content strong, .history-announcement-content b, .history-announcement-content strong, .ai-records-hint b, .ai-records-hint strong {
+  font-weight: bold !important;
+}
+.rich-text-editor i, .rich-text-editor em, .announcement-content i, .announcement-content em, .history-announcement-content i, .history-announcement-content em, .ai-records-hint i, .ai-records-hint em {
+  font-style: italic !important;
+}
+.rich-text-editor blockquote, .announcement-content blockquote, .history-announcement-content blockquote, .ai-records-hint blockquote {
+  margin: 0.8em 0 !important;
+  border-left: 3px solid #d4d4d8 !important;
+  background: #fafafa !important;
+  padding: 0.6rem 0.9rem !important;
+  color: #52525b !important;
+}
 
 /* 旧版浏览器兜底：Tailwind v4 默认颜色使用 oklch/color-mix，
    旧 Chromium/Safari 不支持时会导致深色按钮、半透明面板等元素“消失”。 */

@@ -1,68 +1,253 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
-import { useDebounceFn } from "@vueuse/core"
-import { ArrowLeft, Bot, CheckCircle2, Download, FileText, LoaderCircle, Save, Settings, Sparkles, Trash2, X, Target, Edit3, Eye, ScanLine } from "lucide-vue-next"
+import { ArrowLeft, Bot, CheckCircle2, Coins, Download, FileText, FileSearch, Languages, LoaderCircle, Redo2, Save, Settings, Share2, Trash2, Undo2, X, Edit3, Eye, ScanLine, Pencil, AlertCircle, LayoutTemplate, ArrowRight, Menu, Info } from "lucide-vue-next"
 import Button from "@/components/ui/button/Button.vue"
 import Input from "@/components/ui/input/Input.vue"
+import FlowAgentIcon from "@/components/common/FlowAgentIcon.vue"
+import FlowPointIcon from "@/components/ui/FlowPointIcon.vue"
 import ModuleSidebar from "@/components/editor/ModuleSidebar.vue"
 import ResumeFormPanel from "@/components/editor/ResumeFormPanel.vue"
 import StyleConfigPanel from "@/components/editor/StyleConfigPanel.vue"
 import A4Preview from "@/components/preview/A4Preview.vue"
 import ResumeScorePanel from "@/components/ai/ResumeScorePanel.vue"
 import JdOptimizeModal from "@/components/ai/JdOptimizeModal.vue"
+import ResumeTranslatePanel from "@/components/ai/ResumeTranslatePanel.vue"
 import ResumeAiChatPanel from "@/components/ai/ResumeAiChatPanel.vue"
 import { normalizeResumeData, useResumeStore } from "@/stores/resume"
-import { useEditorStore } from "@/stores/editor"
+import { useEditorStore, type EditorHistorySnapshot } from "@/stores/editor"
 import { exportPdfApi, exportWordApi } from "@/api/export"
-import { clearResumeChatMessagesApi, decideResumeChatChangeApi, getResumeChatMessagesApi, optimizeByJdStreamApi, optimizeSectionStreamApi, scoreResumeStreamApi, sendResumeChatMessageStreamApi } from "@/api/ai"
+import { clearResumeChatMessagesApi, decideResumeChatChangeApi, getAiCapabilityApi, getResumeChatMessagesApi, optimizeByJdStreamApi, optimizeSectionStreamApi, scoreResumeStreamApi, sendResumeChatMessageStreamApi, regenerateResumeChatMessageStreamApi, getFlowPointSummaryApi, translateResumeStreamApi, type FlowPointSummary, type AiCapability, type AiChatAttachment, type AiChatModelOption } from "@/api/ai"
 import { previewHtmlApi } from "@/api/resume"
+import { listTemplatesApi, type TemplateItem } from "@/api/template"
+import TemplatePreview from "@/components/templates/TemplatePreview.vue"
+import ConfirmDialog from "@/components/ui/dialog/ConfirmDialog.vue"
+import ResumeShareDialog from "@/components/resume/ResumeShareDialog.vue"
+import { showGlobalToast } from "@/utils/toast"
+import { createPresetSection } from "@/utils/resumePresets"
+import { applyResumeLanguage, normalizeResumeLanguage } from "@/utils/resumeLocale"
 
 const route = useRoute()
 const router = useRouter()
 const resumeStore = useResumeStore()
 const editor = useEditorStore()
 const showStyle = ref(false)
-type SidePanel = "none" | "style" | "chat" | "score" | "jd" | "outline" | "suggestions" | "global"
-const sidePanel = ref<SidePanel>("chat")
+const mobileMenuOpen = ref(false)
+const showTemplateModal = ref(false)
+const templates = ref<TemplateItem[]>([])
+const showDeleteConfirm = ref(false)
+const showShareDialog = ref(false)
 
-let activeTransition: any = null
+function triggerDelete() {
+  mobileMenuOpen.value = false
+  showDeleteConfirm.value = true
+}
 
-const switchTab = (tab: "chat" | "score" | "jd" | "outline" | "suggestions" | "global") => {
-  if (sidePanel.value === tab) return
-  if (!document.startViewTransition) {
-    sidePanel.value = tab
-    return
-  }
-  
-  if (activeTransition) {
-    try {
-      activeTransition.skipTransition()
-    } catch (e) {
-      // Ignore if transition is already finished to prevent crashing
-    }
-  }
-
+async function confirmDelete() {
+  if (!resumeStore.currentResume?.id) return
   try {
-    const transition = document.startViewTransition(async () => {
-      sidePanel.value = tab
-      await nextTick()
-    })
-    activeTransition = transition
-
-    transition.finished.finally(() => {
-      if (activeTransition === transition) {
-        activeTransition = null
-      }
-    }).catch(() => {})
-  } catch (err) {
-    // Fallback if startViewTransition fails
-    sidePanel.value = tab
+    await resumeStore.deleteResume(resumeStore.currentResume.id)
+    showDeleteConfirm.value = false
+    showGlobalToast("删除成功", "success")
+    router.push("/resumes")
+  } catch (error) {
+    showGlobalToast("删除失败，请重试")
   }
 }
 
+function toggleMobileMenu() {
+  if (showStyle.value || showTemplateModal.value) {
+    showStyle.value = false
+    showTemplateModal.value = false
+    mobileMenuOpen.value = false
+  } else {
+    mobileMenuOpen.value = !mobileMenuOpen.value
+  }
+}
+
+async function openTemplateModal() {
+  if (showTemplateModal.value) {
+    showTemplateModal.value = false
+    return
+  }
+  showTemplateModal.value = true
+  showStyle.value = false
+  if (!templates.value.length) {
+    templates.value = await listTemplatesApi()
+  }
+}
+async function selectTemplate(templateId: string) {
+  if (resumeStore.currentResume?.template_id === templateId) {
+    showTemplateModal.value = false
+    return
+  }
+  if (resumeStore.templateConfig) {
+    resumeStore.templateConfig.template_id = templateId
+    const defaults: Record<string, { theme_color: string; bg_color: string; icon_color: string; line_height?: number }> = {
+      classic: { theme_color: "#2563eb", bg_color: "#ffffff", icon_color: "#2563eb" },
+      tech: { theme_color: "#2563eb", bg_color: "#ffffff", icon_color: "#2563eb" },
+      modern: { theme_color: "#0f766e", bg_color: "#ffffff", icon_color: "#ffffff" },
+      blue_timeline: { theme_color: "#4673f4", bg_color: "#ffffff", icon_color: "#ffffff" },
+      minimal_light: { theme_color: "#333333", bg_color: "#ffffff", icon_color: "#333333" },
+      minimal_mono: { theme_color: "#000000", bg_color: "#ffffff", icon_color: "#6b7280" },
+      modern_clean: { theme_color: "#0f766e", bg_color: "#ffffff", icon_color: "#0f766e" },
+      elegant_line: { theme_color: "#111827", bg_color: "#ffffff", icon_color: "#111827" },
+      editorial_serif: { theme_color: "#8f2d3b", bg_color: "#ffffff", icon_color: "#8f2d3b" },
+      executive_panel: { theme_color: "#1f3a5f", bg_color: "#ffffff", icon_color: "#ffffff" },
+      portfolio_cards: { theme_color: "#2f855a", bg_color: "#ffffff", icon_color: "#2f855a" },
+      compact_matrix: { theme_color: "#475569", bg_color: "#ffffff", icon_color: "#475569", line_height: 1.45 },
+    }
+    if (defaults[templateId]) {
+      resumeStore.templateConfig.theme_color = defaults[templateId].theme_color
+      resumeStore.templateConfig.bg_color = defaults[templateId].bg_color
+      resumeStore.templateConfig.icon_color = defaults[templateId].icon_color
+      resumeStore.templateConfig.header_icon_color = defaults[templateId].icon_color
+      if (defaults[templateId].line_height) resumeStore.templateConfig.line_height = defaults[templateId].line_height
+    }
+    editor.saved = false
+    await save()
+  }
+  showTemplateModal.value = false
+  showGlobalToast("已应用新模板并保存", "success")
+}
+type SidePanel = "none" | "style" | "chat" | "score" | "jd" | "translate" | "outline" | "suggestions" | "global"
+const sidePanel = ref<SidePanel>("chat")
+
+let activeIconFlightCleanup: (() => void) | null = null
+let tabSwitchRequestId = 0
+
+type HeroIconSnapshot = {
+  element: HTMLElement
+  rect: DOMRect
+}
+
+function captureVisibleHeroIcon(): HeroIconSnapshot | null {
+  const elements = document.querySelectorAll<HTMLElement>('[style*="ai-hero-icon"]')
+  for (const element of elements) {
+    const rect = element.getBoundingClientRect()
+    const style = window.getComputedStyle(element)
+    if (rect.width > 0 && rect.height > 0 && style.display !== "none" && style.visibility !== "hidden") {
+      return { element, rect }
+    }
+  }
+  return null
+}
+
+function createHeroIconClone(element: HTMLElement, rect: DOMRect) {
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.classList.add("ai-hero-flight-clone")
+  clone.setAttribute("aria-hidden", "true")
+  Object.assign(clone.style, {
+    position: "fixed",
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    margin: "0",
+    zIndex: "2147483647",
+    pointerEvents: "none",
+    viewTransitionName: "none",
+    transformOrigin: "center",
+    willChange: "left, top, width, height, opacity, filter",
+  })
+  document.body.appendChild(clone)
+  return clone
+}
+
+function cancelActiveIconFlight() {
+  const cleanup = activeIconFlightCleanup
+  activeIconFlightCleanup = null
+  cleanup?.()
+}
+
+function startHeroIconFlight(source: HeroIconSnapshot, target: HeroIconSnapshot) {
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return
+
+  const sourceRect = source.rect
+  const targetRect = target.rect
+  if (!sourceRect.width || !sourceRect.height || !targetRect.width || !targetRect.height) return
+
+  const sourceClone = createHeroIconClone(source.element, sourceRect)
+  const targetClone = createHeroIconClone(target.element, sourceRect)
+  const targetOriginalOpacity = target.element.style.opacity
+  target.element.style.opacity = "0"
+
+  const sourceAnimation = sourceClone.animate(
+    [
+      {
+        left: `${sourceRect.left}px`,
+        top: `${sourceRect.top}px`,
+        width: `${sourceRect.width}px`,
+        height: `${sourceRect.height}px`,
+        opacity: 1,
+        filter: "blur(0)",
+      },
+      {
+        left: `${targetRect.left}px`,
+        top: `${targetRect.top}px`,
+        width: `${targetRect.width}px`,
+        height: `${targetRect.height}px`,
+        opacity: 0,
+        filter: "blur(3px)",
+      },
+    ],
+    { duration: 620, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
+  )
+  const targetAnimation = targetClone.animate(
+    [
+      {
+        left: `${sourceRect.left}px`,
+        top: `${sourceRect.top}px`,
+        width: `${sourceRect.width}px`,
+        height: `${sourceRect.height}px`,
+        opacity: 0,
+        filter: "blur(3px)",
+      },
+      {
+        left: `${targetRect.left}px`,
+        top: `${targetRect.top}px`,
+        width: `${targetRect.width}px`,
+        height: `${targetRect.height}px`,
+        opacity: 1,
+        filter: "blur(0)",
+      },
+    ],
+    { duration: 540, delay: 70, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "both" },
+  )
+
+  let cleaned = false
+  const cleanup = () => {
+    if (cleaned) return
+    cleaned = true
+    sourceAnimation.cancel()
+    targetAnimation.cancel()
+    sourceClone.remove()
+    targetClone.remove()
+    target.element.style.opacity = targetOriginalOpacity
+    if (activeIconFlightCleanup === cleanup) activeIconFlightCleanup = null
+  }
+  activeIconFlightCleanup = cleanup
+  void Promise.allSettled([sourceAnimation.finished, targetAnimation.finished]).then(cleanup)
+}
+
+const switchTab = async (tab: "chat" | "score" | "jd" | "translate" | "outline" | "suggestions" | "global") => {
+  if (sidePanel.value === tab) return
+  const requestId = ++tabSwitchRequestId
+  cancelActiveIconFlight()
+  const sourceIcon = captureVisibleHeroIcon()
+  sidePanel.value = tab
+  await nextTick()
+  if (tab === 'chat') {
+    const chatList = document.querySelector('.chat-stage .overflow-y-auto')
+    if (chatList) chatList.scrollTop = chatList.scrollHeight
+  }
+  if (requestId !== tabSwitchRequestId || !sourceIcon) return
+  const targetIcon = captureVisibleHeroIcon()
+  if (targetIcon) startHeroIconFlight(sourceIcon, targetIcon)
+}
+
 const mainMode = ref<"edit" | "ai">("edit")
-const mobileTab = ref<"edit" | "preview">("edit")
+const mobileTab = ref<"edit" | "ai" | "preview">("edit")
 const formPanelExpanded = ref(true)
 
 const score = ref<any>(null)
@@ -79,10 +264,26 @@ const jdResult = ref<any>(null)
 const jdLoading = ref(false)
 const jdError = ref("")
 const jdStreamText = ref("")
+const translationResult = ref<any>(null)
+const translationLoading = ref(false)
+const translationError = ref("")
+const translationStreamText = ref("")
+let isInitiatingScore = false
+let isInitiatingOptimize = false
+let isInitiatingJd = false
+let isInitiatingTranslation = false
 const chatMessages = ref<any[]>([])
 const chatLoading = ref(false)
 const chatLoaded = ref(false)
+const aiCapability = ref<AiCapability | null>(null)
+const flowPointSummary = ref<FlowPointSummary | null>(null)
+const aiCapabilityLoaded = ref(false)
 const chatDecisionLoadingId = ref<number | string | null>(null)
+const selectedChatModelId = ref<number | null>(Number(localStorage.getItem("vitaflow_chat_model_id") || 0) || null)
+const chatModels = computed<AiChatModelOption[]>(() => aiCapability.value?.chat_models || [])
+const selectedChatModel = computed(() => chatModels.value.find((item) => item.id === selectedChatModelId.value) || chatModels.value[0] || null)
+const effectiveChatModelId = computed(() => selectedChatModel.value?.id ?? selectedChatModelId.value ?? null)
+const supportsChatImages = computed(() => Boolean(selectedChatModel.value?.supports_multimodal ?? aiCapability.value?.supports_multimodal))
 
 const isMobile = ref(false)
 const leftPanelWidth = ref(600)
@@ -93,16 +294,28 @@ onMounted(() => {
   isMobile.value = window.innerWidth < 768
   resizeHandler = () => { isMobile.value = window.innerWidth < 768 }
   window.addEventListener('resize', resizeHandler)
+  window.addEventListener('keydown', handleHistoryShortcut)
+  
+  getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
 })
 
 onUnmounted(() => {
   if (resizeHandler) window.removeEventListener('resize', resizeHandler)
+  window.removeEventListener('keydown', handleHistoryShortcut)
 })
 
 watch(sidePanel, (newVal) => {
   if (newVal === "chat" && !chatLoaded.value) {
     loadChatMessages()
   }
+  if (newVal === "chat" && !aiCapabilityLoaded.value) {
+    loadAiCapability()
+  }
+})
+
+watch(selectedChatModelId, (value) => {
+  if (value) localStorage.setItem("vitaflow_chat_model_id", String(value))
+  else localStorage.removeItem("vitaflow_chat_model_id")
 })
 
 const isResizing = ref(false)
@@ -142,6 +355,21 @@ const previewRefreshing = ref(false)
 const exportLoading = ref<"" | "pdf" | "word">("")
 const applySuccess = ref(false)
 let applyTimer: ReturnType<typeof setTimeout> | undefined
+const toastMessage = ref("")
+const toastType = ref<"success" | "error">("success")
+
+function showToast(msg: string, type: "success" | "error" = "success") {
+  toastMessage.value = msg
+  toastType.value = type
+  setTimeout(() => {
+    if (toastMessage.value === msg) {
+      toastMessage.value = ""
+    }
+  }, 3000)
+}
+let saveDebounceTimer: ReturnType<typeof setTimeout> | undefined
+let historyCommitTimer: ReturnType<typeof setTimeout> | undefined
+let pendingHistoryLabel = "编辑内容"
 let saveChain: Promise<unknown> = Promise.resolve()
 let previewRequestSeq = 0
 const resumeId = computed(() => Number(route.params.id))
@@ -153,10 +381,11 @@ const activeOptimizePreview = computed(() => {
   if (!resumeStore.resumeData || !activeOptimizeResult.value) return null
   return normalizeOptimizedSection(editor.currentSection, activeOptimizeResult.value, resumeStore.resumeData)
 })
-const aiWorkbenchOpen = computed(() => ["chat", "score", "jd"].includes(sidePanel.value))
+const aiWorkbenchOpen = computed(() => ["chat", "score", "jd", "translate"].includes(sidePanel.value))
 const aiWorkbenchTitle = computed(() => {
   if (sidePanel.value === "score") return "简历 简历诊断"
   if (sidePanel.value === "jd") return "JD 匹配作战室"
+  if (sidePanel.value === "translate") return "简历翻译"
   return "AI 简历助手"
 })
 const aiWorkbenchDescription = computed(() => {
@@ -165,28 +394,49 @@ const aiWorkbenchDescription = computed(() => {
   return "围绕当前简历讨论、改写，并在写入前审阅每一处变化"
 })
 
-const debouncedSave = useDebounceFn(() => {
-  void save().catch(() => undefined)
-}, 1500)
+function debouncedSave() {
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer)
+  saveDebounceTimer = setTimeout(() => {
+    saveDebounceTimer = undefined
+    void save().catch(() => undefined)
+  }, 1500)
+}
+
+function cancelDebouncedSave() {
+  if (!saveDebounceTimer) return
+  clearTimeout(saveDebounceTimer)
+  saveDebounceTimer = undefined
+}
 
 onMounted(async () => {
   try {
     await resumeStore.fetchResumeDetail(resumeId.value)
-    if (sidePanel.value === "chat" && !chatLoaded.value) {
-      loadChatMessages()
+    if (!resumeStore.currentResume?.resume_data.layout.section_order.includes(editor.currentSection)) {
+      editor.setCurrentSection("basics")
+    }
+    const initialSnapshot = captureEditorSnapshot()
+    if (initialSnapshot) editor.resetHistory(initialSnapshot)
+    if (sidePanel.value === "chat") {
+      if (!chatLoaded.value) loadChatMessages()
+      if (!aiCapabilityLoaded.value) loadAiCapability()
     }
     if (window.innerWidth < 768) {
       editor.setPreviewScale(Number(((window.innerWidth - 32) / 794).toFixed(2)))
     }
   } catch (error: any) {
     console.error("Failed to load resume:", error)
-    window.alert("简历不存在或无权限访问")
+    showToast("简历不存在或无权限访问", "error")
     router.replace("/")
   }
 })
 
 onBeforeUnmount(() => {
   if (applyTimer) clearTimeout(applyTimer)
+  tabSwitchRequestId += 1
+  cancelActiveIconFlight()
+  cancelDebouncedSave()
+  cancelHistoryCommit()
+  editor.setCurrentSection("basics")
 })
 
 
@@ -200,6 +450,7 @@ async function performSave(options: { refreshPreview?: boolean } = {}) {
     resumeStore.currentResume.template_id = config.template_id
     await resumeStore.updateResume({
       title: resumeStore.currentResume.title,
+      language: resumeStore.currentResume.language,
       resume_data: resumeStore.currentResume.resume_data,
       template_id: resumeStore.currentResume.template_id,
       template_config: config,
@@ -219,6 +470,21 @@ function save(options: { refreshPreview?: boolean } = {}) {
   return saveChain
 }
 
+async function saveAndGoToAiRecords() {
+  await save({ refreshPreview: false })
+  router.push("/ai-records")
+}
+
+async function openShareDialog() {
+  mobileMenuOpen.value = false
+  try {
+    await save({ refreshPreview: false })
+    showShareDialog.value = true
+  } catch {
+    showGlobalToast("保存简历失败，请稍后重试", "error")
+  }
+}
+
 async function refreshPreviewLatest() {
   if (!resumeStore.currentResume) return
   const requestSeq = ++previewRequestSeq
@@ -233,20 +499,128 @@ async function refreshPreviewLatest() {
   }
 }
 
-function markChanged() {
+function captureEditorSnapshot(): EditorHistorySnapshot | null {
+  const current = resumeStore.currentResume
+  if (!current) return null
+  return JSON.parse(JSON.stringify({
+    title: current.title || "",
+    language: current.language || "zh-CN",
+    resume_data: current.resume_data,
+    template_id: current.template_id,
+    template_config: current.template_config,
+  })) as EditorHistorySnapshot
+}
+
+function commitEditorHistory(label = "编辑内容") {
+  const snapshot = captureEditorSnapshot()
+  return snapshot ? editor.commitHistory(snapshot, label) : false
+}
+
+function cancelHistoryCommit() {
+  if (!historyCommitTimer) return
+  clearTimeout(historyCommitTimer)
+  historyCommitTimer = undefined
+}
+
+function scheduleHistoryCommit(label = "编辑内容") {
+  if (editor.applyingHistory) return
+  pendingHistoryLabel = label
+  cancelHistoryCommit()
+  historyCommitTimer = setTimeout(() => {
+    historyCommitTimer = undefined
+    commitEditorHistory(pendingHistoryLabel)
+  }, 600)
+}
+
+function flushHistoryCommit() {
+  if (!historyCommitTimer) return false
+  cancelHistoryCommit()
+  return commitEditorHistory(pendingHistoryLabel)
+}
+
+async function restoreHistorySnapshot(snapshot: EditorHistorySnapshot | null) {
+  if (!snapshot || !resumeStore.currentResume) return
+  cancelDebouncedSave()
+  cancelHistoryCommit()
+  editor.applyingHistory = true
+  const restored = JSON.parse(JSON.stringify(snapshot)) as EditorHistorySnapshot
+  resumeStore.currentResume.title = restored.title
+  resumeStore.currentResume.language = normalizeResumeLanguage(restored.language)
+  resumeStore.currentResume.resume_data = normalizeResumeData(restored.resume_data, restored.language)
+  resumeStore.currentResume.template_id = restored.template_id
+  resumeStore.currentResume.template_config = restored.template_config as any
+  if (!resumeStore.currentResume.resume_data.layout.section_order.includes(editor.currentSection)) {
+    editor.setCurrentSection("basics")
+  }
   editor.saved = false
+  try {
+    await save()
+  } finally {
+    editor.applyingHistory = false
+  }
+}
+
+async function undoLastChange() {
+  if (editor.applyingHistory) return
+  flushHistoryCommit()
+  await restoreHistorySnapshot(editor.takeUndoSnapshot())
+}
+
+async function redoLastChange() {
+  if (editor.applyingHistory) return
+  flushHistoryCommit()
+  await restoreHistorySnapshot(editor.takeRedoSnapshot())
+}
+
+function handleHistoryShortcut(event: KeyboardEvent) {
+  if (!(event.metaKey || event.ctrlKey) || event.altKey) return
+  const key = event.key.toLowerCase()
+  const wantsUndo = key === "z" && !event.shiftKey
+  const wantsRedo = (key === "z" && event.shiftKey) || (key === "y" && !event.shiftKey)
+  if (!wantsUndo && !wantsRedo) return
+  event.preventDefault()
+  if (wantsUndo) void undoLastChange()
+  else void redoLastChange()
+}
+
+function markChanged(label: unknown = "编辑内容") {
+  editor.saved = false
+  scheduleHistoryCommit(typeof label === "string" ? label : "编辑内容")
   debouncedSave()
 }
 
-function addCustomSection() {
+function setResumeLanguage(language: "zh-CN" | "en") {
+  const current = resumeStore.currentResume
+  if (!current) return
+  const previousLanguage = normalizeResumeLanguage(current.language)
+  if (previousLanguage === language) return
+  applyResumeLanguage(current.resume_data, previousLanguage, language)
+  current.resume_data.layout.language_locked = true
+  current.language = language
+  current.resume_data = normalizeResumeData(current.resume_data, language)
+  markChanged("切换简历语言")
+}
+
+async function resetStyleChanged() {
+  markChanged("恢复默认样式")
+  cancelDebouncedSave()
+  flushHistoryCommit()
+  try {
+    await save()
+  } catch (error: any) {
+    showToast(error?.message || "保存默认样式失败", "error")
+  }
+}
+
+function addCustomSection(presetType?: string) {
   const data = resumeStore.resumeData
   if (!data) return
-  const id = `custom_${Date.now()}`
-  data.custom_sections.push({ id, title: "自定义模块", items: [{ id: `item_${Date.now()}`, title: "", content: "" }] })
-  data.layout.section_order.push(id)
-  data.layout.section_titles[id] = "自定义模块"
-  editor.setCurrentSection(id)
-  markChanged()
+  const section = createPresetSection(presetType)
+  data.custom_sections.push(section)
+  data.layout.section_order.push(section.id)
+  data.layout.section_titles[section.id] = section.title
+  editor.setCurrentSection(section.id)
+  markChanged(presetType ? `添加${section.title}` : "添加自定义模块")
 }
 
 function removeCustomSection(key: string) {
@@ -255,6 +629,7 @@ function removeCustomSection(key: string) {
   data.custom_sections = data.custom_sections.filter((item) => item.id !== key)
   data.layout.section_order = data.layout.section_order.filter((item) => item !== key)
   delete data.layout.section_titles[key]
+  if (data.layout.field_labels) delete data.layout.field_labels[key]
   editor.setCurrentSection("basics")
   markChanged()
 }
@@ -291,7 +666,7 @@ function asText(value: unknown): string {
 }
 
 function itemIdentity(item: any) {
-  return String(item?.id || item?.name || item?.company || item?.school || item?.title || "").trim()
+  return String(item?.id || item?.name || item?.company || item?.organization || item?.school || item?.title || item?.publisher || item?.platform || "").trim()
 }
 
 function normalizeSectionItem(key: string, item: any, currentItem: any, index: number) {
@@ -370,6 +745,29 @@ function normalizeCustomSectionValue(value: any, currentValue: any) {
   else if (isObject(value) && Array.isArray(value.items)) items = value.items
   else if (isObject(value) && (value.title || value.content || value.description)) items = [value]
   else if (asText(value)) items = [{ title: "", content: asText(value) }]
+  if (current.preset_type || (isObject(value) && value.preset_type)) {
+    const currentItems = Array.isArray(current.items) ? current.items : []
+    const used = new Set<number>()
+    return {
+      ...current,
+      ...(isObject(value) ? value : {}),
+      id: current.id,
+      title: (isObject(value) && (value.title || value.section_title)) || current.title || "自定义模块",
+      preset_type: current.preset_type || (isObject(value) ? value.preset_type : undefined),
+      items: items.map((item, index) => {
+        const identity = itemIdentity(item)
+        let matchIndex = identity ? currentItems.findIndex((currentItem, currentIndex) => !used.has(currentIndex) && itemIdentity(currentItem) === identity) : -1
+        if (matchIndex < 0 && index < currentItems.length && !used.has(index)) matchIndex = index
+        if (matchIndex >= 0) used.add(matchIndex)
+        const currentItem = matchIndex >= 0 && isObject(currentItems[matchIndex]) ? currentItems[matchIndex] : {}
+        return {
+          ...currentItem,
+          ...(isObject(item) ? item : { description: asText(item) }),
+          id: item?.id || currentItem.id || `item_${Date.now()}_${index}`,
+        }
+      }),
+    }
+  }
   return {
     ...current,
     title: (isObject(value) && (value.title || value.section_title)) || current.title || "自定义模块",
@@ -400,7 +798,7 @@ async function exportPdf() {
     if (!editor.saved) await save({ refreshPreview: false })
     await exportPdfApi(resumeId.value, resumeStore.currentResume?.title || "简历")
   } catch (error: any) {
-    window.alert(error?.message || "PDF 导出失败")
+    showToast(error?.message || "PDF 导出失败", "error")
   } finally {
     exportLoading.value = ""
   }
@@ -413,7 +811,7 @@ async function exportWord() {
     if (!editor.saved) await save({ refreshPreview: false })
     await exportWordApi(resumeId.value, resumeStore.currentResume?.title || "简历")
   } catch (error: any) {
-    window.alert(error?.message || "Word 导出失败")
+    showToast(error?.message || "Word 导出失败", "error")
   } finally {
     exportLoading.value = ""
   }
@@ -426,13 +824,15 @@ async function refreshScore() {
   scoreStreamText.value = ""
   try {
     score.value = await scoreResumeStreamApi(
-      { resume_data: resumeStore.resumeData, target_position: resumeStore.resumeData.basics.title },
+      { resume_id: resumeId.value, resume_data: resumeStore.resumeData, target_position: resumeStore.resumeData.basics.title },
       { onDelta: (text) => (scoreStreamText.value += text) },
     )
   } catch (error: any) {
-    scoreError.value = error.message || "AI 评分失败"
+    scoreError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "AI 评分失败")
   } finally {
+    isInitiatingScore = false
     scoreLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
   }
 }
 
@@ -466,15 +866,44 @@ async function openChatPanel() {
     return
   }
   sidePanel.value = "chat"
+  if (!aiCapabilityLoaded.value) await loadAiCapability()
   if (!chatLoaded.value) await loadChatMessages()
 }
 
-async function sendChatMessage(content: string) {
+async function loadAiCapability() {
+  try {
+    aiCapability.value = await getAiCapabilityApi()
+    const models = aiCapability.value?.chat_models || []
+    if (models.length) {
+      const currentAvailable = selectedChatModelId.value && models.some((item) => item.id === selectedChatModelId.value)
+      if (!currentAvailable) {
+        const defaultId = aiCapability.value?.default_chat_model_id
+        selectedChatModelId.value = defaultId && models.some((item) => item.id === defaultId) ? defaultId : models[0].id
+      } else if (selectedChatModel.value?.id && selectedChatModelId.value !== selectedChatModel.value.id) {
+        selectedChatModelId.value = selectedChatModel.value.id
+      }
+    } else {
+      selectedChatModelId.value = null
+    }
+  } catch {
+    aiCapability.value = null
+  } finally {
+    aiCapabilityLoaded.value = true
+  }
+}
+
+async function sendChatMessage(content: string, attachments: AiChatAttachment[] = []) {
   if (!resumeStore.currentResume || chatLoading.value) return
+  if (!aiCapabilityLoaded.value) await loadAiCapability()
+  if (attachments.length && !supportsChatImages.value) {
+    chatError.value = "当前选择的模型不支持图片输入，请切换到支持多模态的模型后再发送。"
+    return
+  }
+  flushHistoryCommit()
   chatLoading.value = true
   chatError.value = ""
   const stamp = Date.now()
-  const pendingUser = { id: `user-${stamp}`, role: "user", content }
+  const pendingUser = { id: `user-${stamp}`, role: "user", content, attachments }
   const pendingAssistant = { id: `assistant-${stamp}`, role: "assistant", content: "", streaming: true, phase: "replying", phaseText: "正在组织回复" }
   chatMessages.value.push(pendingUser, pendingAssistant)
   const assistantIndex = chatMessages.value.length - 1
@@ -482,7 +911,7 @@ async function sendChatMessage(content: string) {
     if (!editor.saved) await save({ refreshPreview: false })
     const response = (await sendResumeChatMessageStreamApi(
       resumeId.value,
-      { content },
+      { content, attachments, model_config_id: effectiveChatModelId.value },
       {
         onDelta: (text) => {
           const assistant = chatMessages.value[assistantIndex]
@@ -503,19 +932,128 @@ async function sendChatMessage(content: string) {
       if (resolved) Object.assign(resolved, response.resolved_message)
     }
     if (response?.resume_data && resumeStore.currentResume) {
-      resumeStore.updateResumeData(response.resume_data)
+      cancelDebouncedSave()
+      await resumeStore.fetchResumeDetail(resumeId.value)
+      commitEditorHistory("AI 助手修改")
       editor.setSaved(true)
-      await resumeStore.refreshPreviewHtml()
       showApplySuccess()
+    }
+    const usage = response?.usage
+    if (usage) {
+      const points = Number(usage.points_used || 0)
+      if (points > 0) {
+        showGlobalToast(`本次对话消耗了 ${points} 点 Flow Points`, "success")
+      }
     }
     chatLoaded.value = true
   } catch (error: any) {
     const assistant = chatMessages.value[assistantIndex]
     if (assistant) assistant.streaming = false
     if (!assistant?.content) chatMessages.value = chatMessages.value.filter((item) => item.id !== pendingAssistant.id)
-    chatError.value = error.message || "AI 对话失败"
+    chatError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "AI 对话失败")
   } finally {
     chatLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
+  }
+}
+
+async function regenerateChatMessage(message?: any, overrideContent?: string, overrideAttachments?: AiChatAttachment[]) {
+  if (!resumeStore.currentResume || chatLoading.value) return
+  if (!aiCapabilityLoaded.value) await loadAiCapability()
+  let userIndex = -1
+  if (message) {
+    userIndex = chatMessages.value.findIndex((item) => item.id === message.id)
+  } else {
+    for (let index = chatMessages.value.length - 1; index >= 0; index -= 1) {
+      if (chatMessages.value[index]?.role === "user") {
+        userIndex = index
+        break
+      }
+    }
+  }
+  if (userIndex < 0) return
+
+  const userMessage = chatMessages.value[userIndex]
+  if (!userMessage || userMessage.role !== "user") return
+  const content = String(overrideContent ?? userMessage.content ?? "").trim()
+  const attachments = overrideAttachments ? [...overrideAttachments] : [...(userMessage.attachments || [])]
+  if (!content && !attachments.length) return
+  if (attachments.length && !supportsChatImages.value) {
+    chatError.value = "当前选择的模型不支持图片输入，请切换到支持多模态的模型后再重新生成。"
+    return
+  }
+
+  const numericId = Number(userMessage.id)
+  const hasPersistedMessage = Number.isFinite(numericId) && !String(userMessage.id).startsWith("user-")
+  if (!hasPersistedMessage) {
+    chatMessages.value = chatMessages.value.slice(0, userIndex)
+    chatError.value = ""
+    await sendChatMessage(content || "请结合我上传的图片分析简历。", attachments)
+    return
+  }
+
+  flushHistoryCommit()
+  chatLoading.value = true
+  chatError.value = ""
+  userMessage.content = content || "请结合我上传的图片分析简历。"
+  userMessage.attachments = attachments
+  chatMessages.value = chatMessages.value.slice(0, userIndex + 1)
+  const pendingAssistant = {
+    id: `assistant-regenerate-${Date.now()}`,
+    role: "assistant",
+    content: "",
+    streaming: true,
+    phase: "understanding_intent",
+    phaseText: "正在重新理解这条消息",
+  }
+  chatMessages.value.push(pendingAssistant)
+  const assistantIndex = chatMessages.value.length - 1
+
+  try {
+    if (!editor.saved) await save({ refreshPreview: false })
+    const response = (await regenerateResumeChatMessageStreamApi(
+      resumeId.value,
+      numericId,
+      { content: content || "请结合我上传的图片分析简历。", attachments, model_config_id: effectiveChatModelId.value },
+      {
+        onDelta: (text: string) => {
+          const assistant = chatMessages.value[assistantIndex]
+          if (assistant) assistant.content += text
+        },
+        onPhase: (phase: string, text: string) => {
+          const assistant = chatMessages.value[assistantIndex]
+          if (assistant) Object.assign(assistant, { phase, phaseText: text })
+        },
+      },
+    )) as any
+    const assistant = chatMessages.value[assistantIndex]
+    if (assistant && response?.assistant_message) {
+      Object.assign(assistant, response.assistant_message, { streaming: false })
+    } else if (assistant) {
+      assistant.streaming = false
+    }
+    if (response?.resolved_message) {
+      const resolved = chatMessages.value.find((item) => item.id === response.resolved_message.id)
+      if (resolved) Object.assign(resolved, response.resolved_message)
+    }
+    if (response?.resume_data && resumeStore.currentResume) {
+      cancelDebouncedSave()
+      await resumeStore.fetchResumeDetail(resumeId.value)
+      commitEditorHistory("AI 助手修改")
+      editor.setSaved(true)
+      showApplySuccess()
+    }
+    const points = Number(response?.usage?.points_used || 0)
+    if (points > 0) {
+      showGlobalToast(`本次重新生成消耗了 ${points} 点 Flow Points`, "success")
+    }
+    chatLoaded.value = true
+  } catch (error: any) {
+    await loadChatMessages().catch(() => null)
+    chatError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "重新发送失败")
+  } finally {
+    chatLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
   }
 }
 
@@ -546,6 +1084,7 @@ async function optimizeCurrentSection() {
   try {
     optimizeResult.value = await optimizeSectionStreamApi(
       {
+        resume_id: resumeId.value,
         section_type: key,
         section_title: resumeStore.resumeData.layout.section_titles[key],
         section_content: currentSectionValue(key, resumeStore.resumeData),
@@ -556,9 +1095,11 @@ async function optimizeCurrentSection() {
     )
   } catch (error: any) {
     optimizeResult.value = null
-    optimizeError.value = error.message || "模块优化失败"
+    optimizeError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "模块优化失败")
   } finally {
+    isInitiatingOptimize = false
     optimizeLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
   }
 }
 
@@ -577,14 +1118,68 @@ async function optimizeJd(jd: string) {
   sidePanel.value = "jd"
   try {
     jdResult.value = await optimizeByJdStreamApi(
-      { resume_data: resumeStore.resumeData, job_description: jd },
+      { resume_id: resumeId.value, resume_data: resumeStore.resumeData, job_description: jd },
       { onDelta: (text) => (jdStreamText.value += text) },
     )
   } catch (error: any) {
-    jdError.value = error.message || "JD 优化失败"
+    jdError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "JD 优化失败")
   } finally {
+    isInitiatingJd = false
     jdLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
   }
+}
+
+async function translateResume(targetLanguage: "zh-CN" | "en") {
+  if (!resumeStore.currentResume || !resumeStore.resumeData) return
+  translationLoading.value = true
+  translationError.value = ""
+  translationStreamText.value = ""
+  translationResult.value = null
+  sidePanel.value = "translate"
+  try {
+    translationResult.value = await translateResumeStreamApi(
+      {
+        resume_id: resumeId.value,
+        resume_data: resumeStore.resumeData,
+        current_language: resumeStore.currentResume.language,
+        target_language: targetLanguage,
+      },
+      { onDelta: (text) => (translationStreamText.value += text) },
+    )
+  } catch (error: any) {
+    translationError.value = error.message === "SILENT_ERROR" ? "" : (error.message || "简历翻译失败")
+  } finally {
+    isInitiatingTranslation = false
+    translationLoading.value = false
+    getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
+  }
+}
+
+function clearTranslationResult() {
+  translationResult.value = null
+  translationError.value = ""
+  translationStreamText.value = ""
+}
+
+function returnToContentEditor() {
+  mainMode.value = "edit"
+  mobileTab.value = "edit"
+  sidePanel.value = "none"
+}
+
+async function applyTranslationResult(result: any) {
+  if (!resumeStore.currentResume || !result?.translated_resume_data) return
+  flushHistoryCommit()
+  const targetLanguage = normalizeResumeLanguage(result.target_language)
+  resumeStore.currentResume.language = targetLanguage
+  resumeStore.currentResume.resume_data = normalizeResumeData(result.translated_resume_data, targetLanguage)
+  resumeStore.currentResume.resume_data.layout.language_locked = true
+  commitEditorHistory("应用简历翻译")
+  await save()
+  clearTranslationResult()
+  returnToContentEditor()
+  showApplySuccess()
 }
 
 function mergeOptimizedResumeData(currentData: any, optimizedData: any) {
@@ -602,15 +1197,17 @@ function mergeOptimizedResumeData(currentData: any, optimizedData: any) {
     ...optimizedLayout,
     section_order: Array.isArray(optimizedLayout.section_order) && optimizedLayout.section_order.length ? optimizedLayout.section_order : currentLayout.section_order,
     hidden_sections: Array.isArray(optimizedLayout.hidden_sections) ? optimizedLayout.hidden_sections : currentLayout.hidden_sections,
+    field_labels: optimizedLayout.field_labels && typeof optimizedLayout.field_labels === "object" ? optimizedLayout.field_labels : currentLayout.field_labels,
     section_titles: sectionTitles,
   }
-  return normalizeResumeData(mergedData)
+  return normalizeResumeData(mergedData, resumeStore.currentResume?.language)
 }
 
 async function applyOptimizeResult(targetResult?: any) {
   if (!resumeStore.currentResume) return
   const result = targetResult || optimizeResult.value
   if (!result) return
+  flushHistoryCommit()
   if (result.optimized_resume_data) {
     resumeStore.currentResume.resume_data = mergeOptimizedResumeData(resumeStore.currentResume.resume_data, result.optimized_resume_data)
   }
@@ -621,16 +1218,18 @@ async function applyOptimizeResult(targetResult?: any) {
       const custom = resumeStore.currentResume.resume_data.custom_sections.find((item) => item.id === key)
       if (custom) Object.assign(custom, result.optimized_section)
     }
-    resumeStore.currentResume.resume_data = normalizeResumeData(resumeStore.currentResume.resume_data)
+    resumeStore.currentResume.resume_data = normalizeResumeData(resumeStore.currentResume.resume_data, resumeStore.currentResume.language)
   }
   if (!resumeStore.currentResume.resume_data.layout.section_order.includes(editor.currentSection)) editor.setCurrentSection("basics")
+  commitEditorHistory(result === jdResult.value ? "采纳 JD 优化" : "采纳 AI 优化")
   await save()
-  if (aiWorkbenchOpen.value) sidePanel.value = "none"
+  if (aiWorkbenchOpen.value) returnToContentEditor()
   showApplySuccess()
 }
 
 async function applySectionOptimizeResult() {
   if (!resumeStore.currentResume || !resumeStore.resumeData) return
+  flushHistoryCommit()
   const key = optimizeSectionKey.value || editor.currentSection
   const nextSection = normalizeOptimizedSection(key, optimizeResult.value, resumeStore.resumeData)
   if (!nextSection) return
@@ -640,14 +1239,16 @@ async function applySectionOptimizeResult() {
     const custom = resumeStore.currentResume.resume_data.custom_sections.find((item) => item.id === key)
     if (custom && isObject(nextSection)) Object.assign(custom, nextSection)
   }
-  resumeStore.currentResume.resume_data = normalizeResumeData(resumeStore.currentResume.resume_data)
+  resumeStore.currentResume.resume_data = normalizeResumeData(resumeStore.currentResume.resume_data, resumeStore.currentResume.language)
   editor.setCurrentSection(key)
+  commitEditorHistory(`润色${resumeStore.resumeData.layout.section_titles[key] || "当前模块"}`)
   clearSectionOptimizeResult()
   await save()
 }
 
 async function resolveChatDecision(message: any, action: "apply" | "reject") {
   if (!resumeStore.currentResume || !message?.id || chatDecisionLoadingId.value !== null) return
+  if (action === "apply") flushHistoryCommit()
   const previousStatus = message.action_status || "pending"
   chatDecisionLoadingId.value = message.id
   message.action_status = "applying"
@@ -656,10 +1257,11 @@ async function resolveChatDecision(message: any, action: "apply" | "reject") {
     const response = (await decideResumeChatChangeApi(resumeId.value, Number(message.id), action)) as any
     if (response?.assistant_message) Object.assign(message, response.assistant_message)
     if (action === "apply" && response?.resume_data) {
-      resumeStore.updateResumeData(response.resume_data)
+      cancelDebouncedSave()
+      await resumeStore.fetchResumeDetail(resumeId.value)
+      commitEditorHistory("AI 助手修改")
       editor.setSaved(true)
       if (!resumeStore.resumeData?.layout.section_order.includes(editor.currentSection)) editor.setCurrentSection("basics")
-      await resumeStore.refreshPreviewHtml()
       showApplySuccess()
     }
   } catch (error: any) {
@@ -671,8 +1273,12 @@ async function resolveChatDecision(message: any, action: "apply" | "reject") {
 }
 
 function openStylePanel() {
+  if (showStyle.value) {
+    showStyle.value = false
+    return
+  }
   showStyle.value = true
-  sidePanel.value = "style"
+  showTemplateModal.value = false
 }
 
 function openJdPanel() {
@@ -690,82 +1296,248 @@ function closeSidePanel() {
 const sidePanelTitle = computed(() => {
   if (sidePanel.value === "style") return "样式设置"
   if (sidePanel.value === "jd") return "岗位描述(JD)匹配优化"
+  if (sidePanel.value === "translate") return "简历翻译"
   if (sidePanel.value === "chat") return "AI 简历助手"
   return "AI 简历诊断"
 })
+
+// ========================
+// Flow Points Confirmation Logic
+// ========================
+const pointConfirmOpen = ref(false)
+const pointConfirmFeature = ref<"resume_score" | "jd_optimize" | "resume_translate" | "section_optimize">("resume_score")
+const pointConfirmCallback = ref<(() => void) | null>(null)
+
+const pointConfirmTitle = computed(() => {
+  if (pointConfirmFeature.value === "resume_score") return "智能诊断"
+  if (pointConfirmFeature.value === "jd_optimize") return "JD 优化"
+  if (pointConfirmFeature.value === "resume_translate") return "简历翻译"
+  return "模块优化"
+})
+
+const pointConfirmDescription = computed(() => {
+  if (!flowPointSummary.value) return "正在获取点数信息..."
+  const rule = flowPointSummary.value.rules.find(r => r.feature_type === pointConfirmFeature.value)
+  if (!rule) return "本次消耗未知"
+  
+  let costText = `${rule.points_per_call} 点`
+  const inputRate = rule.points_per_million_input_tokens ?? rule.points_per_million_tokens ?? 0
+  const outputRate = rule.points_per_million_output_tokens ?? rule.points_per_million_tokens ?? 0
+  if (inputRate > 0) {
+    costText += ` + 输入 ${inputRate} 点/百万Tokens`
+  }
+  if (outputRate > 0) {
+    costText += ` + 输出 ${outputRate} 点/百万Tokens`
+  }
+  return `预计消耗：${costText}（当前余额：${flowPointSummary.value.balance} 点）`
+})
+
+function requestFeatureWithPoints(feature: "resume_score" | "jd_optimize" | "resume_translate" | "section_optimize", callback: () => void) {
+  pointConfirmFeature.value = feature
+  pointConfirmCallback.value = callback
+  pointConfirmOpen.value = true
+  getFlowPointSummaryApi().then((data) => (flowPointSummary.value = data)).catch(() => null)
+}
+
+function handlePointConfirm() {
+  pointConfirmOpen.value = false
+  if (pointConfirmCallback.value) {
+    pointConfirmCallback.value()
+    pointConfirmCallback.value = null
+  }
+}
+
+function handleFocusOut(event: Event) {
+  const target = event.target as HTMLElement | null
+  if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+    setTimeout(() => {
+      if (!editor.saved) {
+        cancelDebouncedSave()
+        void save().catch(() => undefined)
+      }
+    }, 50)
+  }
+}
 </script>
 
 <template>
-  <div v-if="resumeStore.currentResume && resumeStore.resumeData && resumeStore.templateConfig" class="fixed inset-0 flex flex-col overflow-hidden bg-zinc-100/60">
+  <div v-if="resumeStore.currentResume && resumeStore.resumeData && resumeStore.templateConfig" class="fixed inset-0 flex flex-col overflow-hidden bg-zinc-100/60" @focusout="handleFocusOut">
     <!-- Premium Header -->
-    <header class="flex h-16 shrink-0 items-center gap-4 border-b border-zinc-200/60 bg-white/80 backdrop-blur-md px-6 relative z-40">
-      <Button size="icon" variant="ghost" class="text-zinc-500 hover:text-zinc-900 rounded-lg hover:bg-zinc-100" @click="router.push('/resumes')">
-        <ArrowLeft class="h-5 w-5" />
+    <header class="flex h-14 md:h-16 shrink-0 items-center gap-1.5 md:gap-4 border-b border-zinc-200/60 bg-white/80 backdrop-blur-md px-2 md:px-6 relative z-40">
+      <Button size="icon" variant="ghost" class="h-8 w-8 md:h-10 md:w-10 shrink-0 text-zinc-500 hover:text-zinc-900 rounded-lg hover:bg-zinc-100" @click="router.push('/resumes')">
+        <ArrowLeft class="h-4 w-4 md:h-5 md:w-5" />
       </Button>
       
       <div class="h-8 w-[1px] bg-zinc-200 hidden sm:block"></div>
       
-      <div class="flex items-center gap-3">
-        <div class="inline-grid items-center max-w-[150px] sm:max-w-[400px]">
-          <span class="col-start-1 row-start-1 invisible whitespace-pre pl-2 pr-3 py-1 border border-transparent text-[16px] sm:text-[18px] font-semibold tracking-tight overflow-hidden">{{ resumeStore.currentResume.title || '无标题简历' }}</span>
+      <div class="flex items-center gap-1.5 md:gap-3 flex-1 min-w-0">
+        <div class="group relative inline-grid items-center min-w-[40px] max-w-[140px] sm:max-w-[400px]">
+          <span class="col-start-1 row-start-1 invisible whitespace-pre pl-1 md:pl-2 pr-6 md:pr-8 py-1 border border-transparent text-[14px] sm:text-[18px] font-semibold tracking-tight overflow-hidden">{{ resumeStore.currentResume.title || '无标题简历' }}</span>
           <input 
             v-model="resumeStore.currentResume.title" 
             placeholder="无标题简历"
             size="1"
-            class="col-start-1 row-start-1 w-full min-w-0 border border-transparent bg-transparent px-2 py-1 text-[16px] sm:text-[18px] font-semibold tracking-tight text-zinc-900 shadow-none hover:border-zinc-200 hover:bg-zinc-50 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all outline-none rounded-md truncate"
+            class="peer col-start-1 row-start-1 w-full min-w-0 border border-transparent bg-transparent pl-1 pr-6 md:pl-2 md:pr-8 py-1 text-[14px] sm:text-[18px] font-semibold tracking-tight text-zinc-900 shadow-none hover:border-zinc-200 hover:bg-zinc-50 focus:border-blue-500 focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all outline-none rounded-md truncate"
             @input="markChanged" 
           />
+          <Pencil class="absolute right-1.5 md:right-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none opacity-40 transition-opacity group-hover:opacity-100 peer-focus:opacity-0" />
         </div>
-        <div class="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition-colors whitespace-nowrap" :class="editor.saving ? 'bg-amber-50 text-amber-600' : editor.saveError ? 'bg-red-50 text-red-600' : 'bg-zinc-100 text-zinc-500'">
-          <Save v-if="editor.saving" class="h-3.5 w-3.5 animate-pulse shrink-0" /> 
-          <CheckCircle2 v-else class="h-3.5 w-3.5 shrink-0" :class="{ 'text-blue-500': !editor.saveError }" />
-          <span class="hidden sm:inline">{{ editor.saving ? '保存中' : editor.saveError ? '保存失败' : '已自动保存' }}</span>
+        <div class="flex shrink-0 items-center gap-1 md:gap-1.5 text-[10px] md:text-xs font-medium transition-colors whitespace-nowrap" :class="editor.saving ? 'text-amber-500' : editor.saveError ? 'text-red-500' : 'text-zinc-500'">
+          <Save v-if="editor.saving" class="h-3 w-3 md:h-3.5 md:w-3.5 animate-pulse shrink-0" /> 
+          <CheckCircle2 v-else class="h-3 w-3 md:h-3.5 md:w-3.5 shrink-0" :class="editor.saveError ? 'text-red-500' : 'text-emerald-500'" />
+          <span class="hidden sm:inline">{{ editor.saving ? '保存中...' : editor.saveError ? '保存失败' : '已自动保存' }}</span>
         </div>
       </div>
       
-      <div class="ml-auto flex items-center gap-2.5">
+      <!-- 极简撤销恢复按钮组与操作区 -->
+      <div class="ml-auto flex items-center gap-1 md:gap-2.5 shrink-0">
+        <div class="flex items-center gap-0.5">
+          <Button
+            size="icon"
+            variant="ghost"
+            class="h-8 w-8 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-30 disabled:hover:bg-transparent"
+            :disabled="editor.applyingHistory || !editor.canUndo"
+            :title="editor.canUndo ? `撤销：${editor.undoLabel}` : '没有可撤销的操作'"
+            aria-label="撤销上一步操作"
+            @click="undoLastChange"
+          >
+            <Undo2 class="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            class="h-8 w-8 rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-30 disabled:hover:bg-transparent"
+            :disabled="editor.applyingHistory || !editor.canRedo"
+            :title="editor.canRedo ? `恢复：${editor.redoLabel}` : '没有可恢复的操作'"
+            aria-label="恢复上一步操作"
+            @click="redoLastChange"
+          >
+            <Redo2 class="h-4 w-4" />
+          </Button>
+        </div>
 
-        
         <div class="h-6 w-[1px] bg-zinc-200 hidden md:block mx-0.5 md:mx-1"></div>
 
-        <Button size="icon" variant="outline" class="shrink-0 h-8 w-8 md:h-10 md:w-10 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm" @click="openStylePanel" title="主题设置">
-          <Settings class="h-4 w-4 shrink-0" />
-        </Button>
-        <Button size="sm" variant="outline" class="!hidden md:!inline-flex shrink-0 h-10 px-4 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm font-medium" :disabled="!!exportLoading" @click="exportWord">
-          <FileText class="h-4 w-4 shrink-0 mr-1.5" /> Word
-        </Button>
-        <Button size="sm" class="shrink-0 h-8 px-3 md:h-10 md:px-5 bg-zinc-900 text-white hover:bg-zinc-800 rounded-lg shadow-md active:scale-95 transition-all font-medium text-xs md:text-sm whitespace-nowrap" :disabled="!!exportLoading" @click="exportPdf">
-          <Download class="h-3 w-3 md:h-4 md:w-4 shrink-0" /> <span class="hidden md:inline ml-1.5">导出</span> PDF
-        </Button>
+        <!-- Flow Points 账户余额展示（移动至右侧主功能区，支持点击保存并跳转） -->
+        <div 
+          v-if="flowPointSummary" 
+          class="hidden md:flex shrink-0 items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 shadow-sm cursor-pointer hover:bg-zinc-50 hover:border-zinc-300 transition-all active:scale-95"
+          title="点击保存并前往 Flow Points 兑换页"
+          @click="saveAndGoToAiRecords"
+        >
+          <FlowPointIcon class="h-4 w-4 text-zinc-700" />
+          <span>{{ flowPointSummary.balance }}</span>
+        </div>
+
+        <div class="h-6 w-[1px] bg-zinc-200 hidden md:block mx-0.5 md:mx-1"></div>
+
+        <!-- Desktop Action Buttons -->
+        <div class="hidden md:flex items-center gap-2">
+          <Button size="sm" variant="outline" class="shrink-0 h-10 px-3.5 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm font-medium text-sm flex items-center justify-center" @click="openTemplateModal" title="更换模板">
+            <LayoutTemplate class="h-4 w-4 shrink-0 mr-1.5" /> <span>模板</span>
+          </Button>
+          <Button size="sm" variant="outline" class="shrink-0 h-10 px-3.5 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm font-medium text-sm flex items-center justify-center" @click="openStylePanel" title="主题设置">
+            <Settings class="h-4 w-4 shrink-0 mr-1.5" /> <span>设置</span>
+          </Button>
+          <Button size="sm" variant="outline" class="shrink-0 h-10 px-3.5 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm font-medium text-sm flex items-center justify-center" @click="openShareDialog" title="分享简历">
+            <Share2 class="h-4 w-4 shrink-0 mr-1.5" /> <span>分享</span>
+          </Button>
+          <Button v-if="false" size="sm" variant="outline" class="!hidden md:!inline-flex shrink-0 h-10 px-4 border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 rounded-lg shadow-sm font-medium" :disabled="!!exportLoading" @click="exportWord">
+            <FileText class="h-4 w-4 shrink-0 mr-1.5" /> Word
+          </Button>
+          <Button size="sm" class="shrink-0 h-10 px-5 bg-zinc-900 text-white hover:bg-zinc-800 rounded-lg shadow-md active:scale-95 transition-all font-medium text-sm whitespace-nowrap flex items-center justify-center" :disabled="!!exportLoading" @click="exportPdf">
+            <Download class="h-4 w-4 shrink-0 mr-1.5" /> 导出
+          </Button>
+        </div>
+
+        <!-- Mobile Hamburger Button -->
+        <button 
+          @click="toggleMobileMenu" 
+          class="md:hidden p-2 rounded-lg text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 focus:outline-none transition-colors"
+          aria-label="Toggle Mobile Menu"
+        >
+          <Menu v-if="!mobileMenuOpen && !showStyle && !showTemplateModal" class="h-5 w-5" />
+          <X v-else class="h-5 w-5" />
+        </button>
       </div>
+
+      <!-- Mobile Dropdown Menu -->
+      <Transition name="modal-fade">
+        <div v-if="mobileMenuOpen" class="md:hidden absolute top-[calc(100%-4px)] right-2 w-36 border border-zinc-200/80 rounded-2xl bg-white/95 backdrop-blur-xl p-2 space-y-1 shadow-2xl z-50">
+          <div v-if="flowPointSummary" class="flex items-center justify-between px-2.5 py-2 rounded-xl bg-zinc-100/70 text-zinc-700 text-xs font-medium mb-1 cursor-pointer hover:bg-zinc-200/50 transition-colors" @click="saveAndGoToAiRecords">
+            <div class="flex items-center gap-1.5">
+              <FlowPointIcon class="h-3.5 w-3.5 text-zinc-600" />
+              <span>余额</span>
+            </div>
+            <span class="font-semibold text-zinc-900">{{ flowPointSummary.balance }}</span>
+          </div>
+          <button 
+            class="flex items-center w-full gap-2 px-2.5 py-2 rounded-xl text-zinc-700 hover:bg-zinc-100 transition-colors text-xs font-medium"
+            @click="mobileMenuOpen = false; openTemplateModal()"
+          >
+            <LayoutTemplate class="h-3.5 w-3.5 text-zinc-500" />
+            <span>模板</span>
+          </button>
+          <button 
+            class="flex items-center w-full gap-2 px-2.5 py-2 rounded-xl text-zinc-700 hover:bg-zinc-100 transition-colors text-xs font-medium"
+            @click="mobileMenuOpen = false; openStylePanel()"
+          >
+            <Settings class="h-4 w-4 text-zinc-500" />
+            <span>设置</span>
+          </button>
+          <button
+            class="flex items-center w-full gap-2 px-2.5 py-2 rounded-xl text-zinc-700 hover:bg-zinc-100 transition-colors text-xs font-medium"
+            @click="openShareDialog"
+          >
+            <Share2 class="h-4 w-4 text-zinc-500" />
+            <span>分享</span>
+          </button>
+          <button 
+            class="flex items-center w-full gap-2 px-2.5 py-2 rounded-xl text-red-600 hover:bg-red-50 transition-colors text-xs font-medium"
+            @click="triggerDelete"
+          >
+            <Trash2 class="h-4 w-4 text-red-500" />
+            <span>删除</span>
+          </button>
+          <button 
+            class="flex items-center justify-center w-full gap-2 px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-all active:scale-95 text-xs font-medium shadow-sm mt-2"
+            :disabled="!!exportLoading"
+            @click="mobileMenuOpen = false; exportPdf()"
+          >
+            <Download class="h-4 w-4 text-zinc-400" />
+            <span>导出 PDF</span>
+          </button>
+        </div>
+      </Transition>
     </header>
 
     <!-- Main Workspace -->
-    <div class="relative flex min-h-0 flex-1 overflow-hidden pb-14 md:pb-0">
+    <div class="relative flex min-h-0 flex-1 overflow-hidden pb-0">
       <div class="workspace-surface flex min-w-0 flex-1">
         <!-- Left Unified Sidebar -->
-        <div :class="['flex-col h-full shrink-0 bg-white overflow-hidden transition-none relative z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]', mobileTab === 'edit' ? 'flex w-full' : 'hidden md:flex']" :style="{ width: isMobile ? '100%' : leftPanelWidth + 'px' }">
+        <!-- Left Unified Sidebar -->
+        <div :class="['flex-col h-full shrink-0 bg-white overflow-hidden transition-none relative z-20 shadow-[4px_0_24px_rgba(0,0,0,0.02)]', (mobileTab === 'edit' || mobileTab === 'ai') ? 'flex w-full' : 'hidden md:flex']" :style="{ width: isMobile ? '100%' : leftPanelWidth + 'px' }">
           
           <!-- Mode Switcher -->
-          <div class="shrink-0 border-b border-zinc-200/50 p-2.5 bg-zinc-50/80 flex justify-center w-full z-10 relative">
-             <div class="flex w-full bg-zinc-200/50 p-1 rounded-xl shadow-inner border border-zinc-200/80">
+          <div class="hidden md:flex shrink-0 border-b border-zinc-200/50 p-1.5 md:p-2.5 bg-zinc-50/80 justify-center w-full z-10 relative">
+             <div class="flex w-full bg-zinc-200/50 p-1 rounded-lg md:rounded-xl shadow-inner border border-zinc-200/80">
                 <button 
-                  class="relative flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[14px] font-medium transition-all duration-300"
+                  class="relative flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1 md:py-1.5 rounded-md md:rounded-lg text-xs md:text-[14px] font-medium transition-all duration-300"
                   :class="mainMode === 'edit' ? 'text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
                   @click="mainMode = 'edit'"
                 >
-                  <div v-if="mainMode === 'edit'" class="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)]"></div>
-                  <Edit3 class="relative z-10 w-4 h-4" />
+                  <div v-if="mainMode === 'edit'" class="absolute inset-0 bg-white rounded-md md:rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)]"></div>
+                  <Edit3 class="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" />
                   <span class="relative z-10">内容编辑</span>
                 </button>
                 <button 
-                  class="relative flex-1 flex items-center justify-center gap-2 py-1.5 rounded-lg text-[14px] font-medium transition-all duration-300"
+                  class="relative flex-1 flex items-center justify-center gap-1.5 md:gap-2 py-1 md:py-1.5 rounded-md md:rounded-lg text-xs md:text-[14px] font-medium transition-all duration-300"
                   :class="mainMode === 'ai' ? 'text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700'"
                   @click="mainMode = 'ai'; if(sidePanel === 'none') sidePanel = 'chat'"
                 >
-                  <div v-if="mainMode === 'ai'" class="absolute inset-0 bg-white rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-blue-100/50"></div>
-                  <Sparkles class="relative z-10 w-4 h-4" :class="mainMode === 'ai' ? 'text-blue-500' : ''" />
-                  <span class="relative z-10 font-bold tracking-tight">Flow Agent (Beta)</span>
+                  <div v-if="mainMode === 'ai'" class="absolute inset-0 bg-white rounded-md md:rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] border border-blue-100/50"></div>
+                  <FlowAgentIcon class="relative z-10 w-3.5 h-3.5 md:w-4 md:h-4" :class="mainMode === 'ai' ? 'text-blue-500' : ''" />
+                  <span class="relative z-10 font-bold tracking-tight">Flow Agent</span>
                 </button>
              </div>
           </div>
@@ -780,7 +1552,7 @@ const sidePanelTitle = computed(() => {
               @change="markChanged" 
               @add-custom="addCustomSection" 
               @remove-custom="removeCustomSection" 
-              @optimize="optimizeCurrentSection" 
+              @optimize="() => requestFeatureWithPoints('section_optimize', optimizeCurrentSection)" 
             />
 
             <ResumeFormPanel
@@ -788,6 +1560,7 @@ const sidePanelTitle = computed(() => {
               :data="resumeStore.resumeData"
               :config="resumeStore.templateConfig"
               :current="editor.currentSection"
+              :language="resumeStore.currentResume.language"
               :show-style="false"
               :optimize-result="activeOptimizeResult"
               :optimize-preview="activeOptimizePreview"
@@ -796,7 +1569,7 @@ const sidePanelTitle = computed(() => {
               :optimize-stream-text="activeOptimizeStreamText"
               :is-wide="isWide"
               @change="markChanged"
-              @optimize="optimizeCurrentSection"
+              @optimize="() => requestFeatureWithPoints('section_optimize', optimizeCurrentSection)"
               @apply-optimize="applySectionOptimizeResult"
               @clear-optimize="clearSectionOptimizeResult"
             />
@@ -805,23 +1578,38 @@ const sidePanelTitle = computed(() => {
           <!-- AI Workbench Mode -->
           <div v-show="mainMode === 'ai'" class="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
             <header class="relative shrink-0 border-b border-zinc-200/60 bg-white flex flex-col z-10">
-              <nav class="flex items-center overflow-x-auto overflow-y-hidden px-4 py-3 gap-2.5 w-full scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <button class="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-full px-4 text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'chat' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('chat')">
-                  <Bot class="h-4 w-4 shrink-0" /> <span class="whitespace-nowrap">AI 助手</span>
+              <nav class="flex items-center overflow-x-auto overflow-y-hidden px-2 md:px-4 py-2.5 md:py-3 gap-1 md:gap-2 w-full scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'chat' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('chat')">
+                  <Bot class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">AI 助手</span>
                 </button>
-                <button class="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-full px-4 text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'score' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('score')">
-                  <ScanLine class="h-4 w-4 shrink-0" /> <span class="whitespace-nowrap"> 简历诊断</span>
+                <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'score' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('score')">
+                  <ScanLine class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">简历诊断</span>
                 </button>
-                <button class="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-full px-4 text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'jd' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('jd')">
-                  <Target class="h-4 w-4 shrink-0" /> <span class="whitespace-nowrap">JD 优化</span>
+                <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'jd' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('jd')">
+                  <FileSearch class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">JD 优化</span>
+                </button>
+                <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'translate' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('translate')">
+                  <Languages class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">简历翻译</span>
                 </button>
               </nav>
             </header>
 
             <div class="relative min-h-0 flex-1 overflow-hidden p-0 md:p-0">
-                <ResumeAiChatPanel v-if="sidePanel === 'chat'" key="chat" :messages="chatMessages" :loading="chatLoading" :error="chatError" :decision-loading-id="chatDecisionLoadingId" @send="sendChatMessage" @clear="clearChatMessages" @confirm="resolveChatDecision($event, 'apply')" @reject="resolveChatDecision($event, 'reject')" />
-              <ResumeScorePanel v-else-if="sidePanel === 'score'" key="score" :score="score" :loading="scoreLoading" :error="scoreError" :stream-text="scoreStreamText" :is-wide="isWide" @refresh="refreshScore" />
-              <JdOptimizeModal v-else key="jd" v-model="jdText" :result="jdResult" :loading="jdLoading" :error="jdError" :stream-text="jdStreamText" :current-data="resumeStore.resumeData" :is-wide="isWide" @optimize="optimizeJd" @apply="applyOptimizeResult(jdResult)" @clear="jdResult = null; jdError = ''; jdStreamText = ''" />
+                <ResumeAiChatPanel v-if="sidePanel === 'chat'" key="chat" v-model:selected-model-id="selectedChatModelId" :chat-models="chatModels" :messages="chatMessages" :loading="chatLoading" :error="chatError" :decision-loading-id="chatDecisionLoadingId" :active="mainMode === 'ai' && sidePanel === 'chat'" :supports-multimodal="supportsChatImages" @send="sendChatMessage" @regenerate="regenerateChatMessage" @clear="clearChatMessages" @confirm="resolveChatDecision($event, 'apply')" @reject="resolveChatDecision($event, 'reject')" />
+              <ResumeScorePanel v-else-if="sidePanel === 'score'" key="score" :score="score" :loading="scoreLoading" :error="scoreError" :stream-text="scoreStreamText" :is-wide="isWide" @refresh="() => requestFeatureWithPoints('resume_score', refreshScore)" />
+              <JdOptimizeModal v-else-if="sidePanel === 'jd'" key="jd" v-model="jdText" :result="jdResult" :loading="jdLoading" :error="jdError" :stream-text="jdStreamText" :current-data="resumeStore.resumeData" :is-wide="isWide" @optimize="(jd) => requestFeatureWithPoints('jd_optimize', () => optimizeJd(jd))" @apply="applyOptimizeResult({ optimized_resume_data: $event })" @clear="jdResult = null; jdError = ''; jdStreamText = ''" />
+              <ResumeTranslatePanel
+                v-else-if="sidePanel === 'translate'"
+                key="translate"
+                :current-language="resumeStore.currentResume.language"
+                :result="translationResult"
+                :loading="translationLoading"
+                :error="translationError"
+                :stream-text="translationStreamText"
+                @translate="(target) => requestFeatureWithPoints('resume_translate', () => translateResume(target))"
+                @apply="applyTranslationResult"
+                @clear="clearTranslationResult"
+              />
             </div>
           </div>
         </div>
@@ -848,19 +1636,51 @@ const sidePanelTitle = computed(() => {
         </div>
       </div>
 
+      <!-- Backdrop for closing side panels when clicking outside -->
+      <Transition name="fade">
+        <div v-if="showStyle || showTemplateModal" class="absolute inset-0 z-[55] bg-transparent" @click="showStyle = false; showTemplateModal = false"></div>
+      </Transition>
+
       <!-- Style remains a focused utility drawer. -->
       <Transition name="slide-panel">
-        <aside v-if="sidePanel === 'style'" class="absolute bottom-0 right-0 top-0 z-[60] flex w-full flex-col border-l border-zinc-200/80 bg-white/95 backdrop-blur-2xl shadow-2xl md:w-[420px]">
-          <div class="shrink-0 border-b border-zinc-100/80 p-5 bg-white/50">
+        <aside v-if="showStyle" class="absolute bottom-0 right-0 top-0 z-[60] flex w-full flex-col border-l border-zinc-200/80 bg-white/95 backdrop-blur-2xl shadow-2xl md:w-[420px]">
+          <div class="shrink-0 border-b border-zinc-100/80 px-4 py-2 md:px-5 md:py-3.5 bg-white/50">
             <div class="flex items-center justify-between gap-3">
-              <h2 class="text-lg font-semibold text-zinc-900 tracking-tight">{{ sidePanelTitle }}</h2>
-              <Button size="icon" variant="ghost" class="text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 rounded-full h-8 w-8 transition-colors" @click="closeSidePanel">
+              <h2 class="text-base md:text-lg font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
+                <Settings class="w-4 h-4 md:w-5 md:h-5 text-zinc-700"/> 设置
+              </h2>
+              <Button size="icon" variant="ghost" class="!hidden md:!inline-flex text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 rounded-full h-8 w-8 transition-colors" @click="showStyle = false">
                 <X class="h-4 w-4" />
               </Button>
             </div>
           </div>
           <div class="min-h-0 flex-1 overflow-y-auto p-6 thin-scrollbar bg-white/40">
-            <StyleConfigPanel :config="resumeStore.templateConfig" @change="markChanged" />
+            <section class="mb-8">
+              <div class="mb-3 flex items-center gap-1.5 relative group">
+                <h3 class="text-[14px] font-semibold text-zinc-900">简历语言</h3>
+                <Info class="h-4 w-4 text-zinc-400 cursor-help transition-colors group-hover:text-zinc-600" />
+                <div class="pointer-events-none absolute left-0 top-full mt-1.5 w-[280px] origin-top-left scale-95 rounded-[12px] bg-zinc-800 p-3 text-[13px] leading-relaxed text-zinc-100 opacity-0 shadow-xl transition-all duration-200 group-hover:pointer-events-auto group-hover:scale-100 group-hover:opacity-100 z-50">
+                  切换语言会更新默认模块标题、字段标签和导出语言；已填写正文、手动修改或 AI 生成的标题不会被覆盖。
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-1.5 rounded-[10px] bg-zinc-100/80 p-1 ring-1 ring-zinc-200/50">
+                <button
+                  class="h-9 rounded-lg text-sm font-medium transition"
+                  :class="normalizeResumeLanguage(resumeStore.currentResume.language) === 'zh-CN' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'"
+                  @click="setResumeLanguage('zh-CN')"
+                >
+                  简体中文
+                </button>
+                <button
+                  class="h-9 rounded-lg text-sm font-medium transition"
+                  :class="normalizeResumeLanguage(resumeStore.currentResume.language) === 'en' ? 'bg-white text-zinc-950 shadow-sm' : 'text-zinc-500 hover:text-zinc-900'"
+                  @click="setResumeLanguage('en')"
+                >
+                  English
+                </button>
+              </div>
+            </section>
+            <StyleConfigPanel :config="resumeStore.templateConfig" @change="markChanged" @reset-default="resetStyleChanged" />
           </div>
         </aside>
       </Transition>
@@ -875,7 +1695,58 @@ const sidePanelTitle = computed(() => {
           </div>
         </div>
       </Transition>
+
+      <!-- Template Selection Side Panel (Consistent with Style Panel) -->
+      <Transition name="slide-panel">
+        <aside v-if="showTemplateModal" class="absolute bottom-0 right-0 top-0 z-[60] flex w-full flex-col border-l border-zinc-200/80 bg-white/95 backdrop-blur-2xl shadow-2xl md:w-[420px]">
+          <div class="shrink-0 border-b border-zinc-100/80 px-4 py-2 md:px-5 md:py-3.5 bg-white/50">
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-base md:text-lg font-semibold text-zinc-900 tracking-tight flex items-center gap-2">
+                <LayoutTemplate class="w-4 h-4 md:w-5 md:h-5 text-zinc-700"/> 选择模板
+              </h2>
+              <Button size="icon" variant="ghost" class="!hidden md:!inline-flex text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 rounded-full h-8 w-8 transition-colors" @click="showTemplateModal = false">
+                <X class="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 thin-scrollbar bg-white/40">
+            <div class="grid grid-cols-2 gap-3.5">
+              <article v-for="item in templates" :key="item.template_id" 
+                       class="group flex flex-col rounded-xl border border-zinc-200/60 bg-white p-2.5 sm:p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:border-zinc-300 cursor-pointer"
+                       @click="selectTemplate(item.template_id)">
+                <div class="relative w-full aspect-[4/3] overflow-hidden rounded-md bg-white border border-zinc-100 transition-transform duration-300 group-hover:scale-[1.02] shadow-sm">
+                  <div class="absolute inset-x-0 top-0">
+                    <TemplatePreview :html="item.preview_html" />
+                  </div>
+                  <div class="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-white to-transparent pointer-events-none"></div>
+                </div>
+                <div class="mt-2.5 sm:mt-3 flex flex-col gap-0.5 sm:gap-1 flex-1">
+                  <h3 class="font-medium text-zinc-900 text-xs sm:text-sm truncate">{{ item.name }}</h3>
+                  <p class="text-[10px] sm:text-xs text-zinc-500">{{ item.category }}适用</p>
+                </div>
+                <div class="mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-zinc-100 flex items-center justify-between text-[11px] sm:text-xs font-semibold"
+                     :class="resumeStore.currentResume?.template_id === item.template_id ? 'text-zinc-400' : 'text-zinc-900'">
+                  <span>{{ resumeStore.currentResume?.template_id === item.template_id ? '当前使用' : '立即应用' }}</span>
+                  <CheckCircle2 v-if="resumeStore.currentResume?.template_id === item.template_id" class="h-3 sm:h-3.5 w-3 sm:w-3.5 shrink-0 text-zinc-400" />
+                  <ArrowRight v-else class="h-3 sm:h-3.5 w-3 sm:w-3.5 transition-transform group-hover:translate-x-1 shrink-0" />
+                </div>
+              </article>
+            </div>
+          </div>
+        </aside>
+      </Transition>
     </div>
+
+    <!-- Toast Notification -->
+    <Teleport to="body">
+      <Transition name="toast-slide">
+        <div v-if="toastMessage" class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] flex w-max max-w-[90vw] items-center gap-2 rounded-xl bg-zinc-900 px-5 py-3 text-sm font-medium text-white shadow-xl border border-zinc-800">
+          <CheckCircle2 v-if="toastType === 'success'" class="h-4 w-4 shrink-0 text-emerald-400" />
+          <AlertCircle v-else-if="toastType === 'error'" class="h-4 w-4 shrink-0 text-red-400" />
+          <span class="break-words">{{ toastMessage }}</span>
+        </div>
+      </Transition>
+    </Teleport>
 
     <Transition name="export-fade">
       <div v-if="exportLoading" class="fixed inset-0 z-[80] flex items-center justify-center bg-zinc-950/45 px-6 backdrop-blur-sm">
@@ -891,17 +1762,65 @@ const sidePanelTitle = computed(() => {
       </div>
     </Transition>
 
-    <!-- Mobile Bottom Nav -->
-    <div class="md:hidden fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-zinc-200 flex items-center z-50">
-      <button class="flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors" :class="mobileTab === 'edit' ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'" @click="mobileTab = 'edit'">
-        <Edit3 class="w-5 h-5" />
-        <span class="text-[10px] font-medium leading-none">编辑</span>
-      </button>
-      <button class="flex flex-col items-center justify-center flex-1 h-full gap-1 transition-colors" :class="mobileTab === 'preview' ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'" @click="mobileTab = 'preview'">
-        <Eye class="w-5 h-5" />
-        <span class="text-[10px] font-medium leading-none">预览</span>
-      </button>
+    <!-- Mobile Bottom Nav (Apple Liquid Glass Navigation Pod) -->
+    <div class="md:hidden fixed bottom-2.5 left-1/2 -translate-x-1/2 z-50 max-w-[260px] w-[82%] bg-white/55 backdrop-blur-3xl border border-white/80 rounded-full p-1.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.9),_0_8px_32px_-6px_rgba(0,0,0,0.14)] select-none">
+      <div class="relative w-full flex items-center justify-between">
+        <!-- Gliding Active Indicator Pill -->
+        <div 
+          class="absolute top-0 bottom-0 w-1/3 bg-white rounded-full shadow-[0_4px_16px_rgba(0,0,0,0.12),_inset_0_1px_1px_rgba(255,255,255,1)] transition-transform duration-300 ease-out pointer-events-none"
+          :class="{
+            'translate-x-0': mobileTab === 'edit',
+            'translate-x-[100%]': mobileTab === 'ai',
+            'translate-x-[200%]': mobileTab === 'preview'
+          }"
+        ></div>
+
+        <!-- Edit Tab -->
+        <button class="relative z-10 flex items-center justify-center flex-1 h-[34px] gap-1 group active:scale-95 transition-all duration-300 rounded-full bg-transparent" :class="mobileTab === 'edit' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-800'" @click="mobileTab = 'edit'; mainMode = 'edit'">
+          <Edit3 class="w-3.5 h-3.5 transition-transform duration-300" :class="mobileTab === 'edit' ? 'stroke-[2.2]' : ''" />
+          <span class="text-[12px] tracking-tight transition-all duration-300" :class="mobileTab === 'edit' ? 'font-semibold' : 'font-medium'">编辑</span>
+        </button>
+
+        <!-- Flow Agent AI Tab -->
+        <button class="relative z-10 flex items-center justify-center flex-1 h-[34px] gap-1 group active:scale-95 transition-all duration-300 rounded-full bg-transparent" :class="mobileTab === 'ai' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-800'" @click="mobileTab = 'ai'; mainMode = 'ai'; if(sidePanel === 'none') sidePanel = 'chat'">
+          <FlowAgentIcon class="w-3.5 h-3.5 transition-all duration-300" :class="mobileTab === 'ai' ? 'text-blue-600' : ''" />
+          <span class="text-[12px] tracking-tight transition-all duration-300" :class="mobileTab === 'ai' ? 'font-semibold' : 'font-medium'">Agent</span>
+        </button>
+
+        <!-- Preview Tab -->
+        <button class="relative z-10 flex items-center justify-center flex-1 h-[34px] gap-1 group active:scale-95 transition-all duration-300 rounded-full bg-transparent" :class="mobileTab === 'preview' ? 'text-zinc-900' : 'text-zinc-500 hover:text-zinc-800'" @click="mobileTab = 'preview'">
+          <Eye class="w-3.5 h-3.5 transition-transform duration-300" :class="mobileTab === 'preview' ? 'stroke-[2.2]' : ''" />
+          <span class="text-[12px] tracking-tight transition-all duration-300" :class="mobileTab === 'preview' ? 'font-semibold' : 'font-medium'">预览</span>
+        </button>
+      </div>
     </div>
+
+    <!-- Confirm Flow Points Dialog -->
+    <ConfirmDialog
+      v-model:open="pointConfirmOpen"
+      :title="`确认进行${pointConfirmTitle}？`"
+      :description="pointConfirmDescription"
+      confirm-text="确认使用"
+      cancel-text="取消"
+      @confirm="handlePointConfirm"
+    />
+
+    <!-- Confirm Delete Resume Dialog -->
+    <ConfirmDialog
+      v-model:open="showDeleteConfirm"
+      title="确认删除该简历？"
+      description="删除后该简历及全部内容将无法恢复，确认继续吗？"
+      confirm-text="确认删除"
+      cancel-text="取消"
+      @confirm="confirmDelete"
+    />
+
+    <ResumeShareDialog
+      v-if="resumeStore.currentResume"
+      v-model:open="showShareDialog"
+      :resume-id="resumeStore.currentResume.id"
+      :resume-title="resumeStore.currentResume.title"
+    />
   </div>
   <div v-else class="flex h-screen flex-col items-center justify-center bg-zinc-50">
     <div class="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-zinc-900 mb-4"></div>
@@ -1085,59 +2004,20 @@ const sidePanelTitle = computed(() => {
 </style>
 
 <style>
-/* Ultimate Premium Spatial Float & Settle Morph for AI Hero Icon */
-
-/* Prevent the transition overlay from blocking user clicks! */
-::view-transition {
-  pointer-events: none;
+.ai-hero-flight-clone,
+.ai-hero-flight-clone * {
+  pointer-events: none !important;
+  user-select: none !important;
 }
 
-::view-transition-group(ai-hero-icon) {
-  animation-duration: 0.85s;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+.toast-slide-enter-active,
+.toast-slide-leave-active {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.toast-slide-enter-from,
+.toast-slide-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 20px) scale(0.95);
 }
 
-::view-transition-old(ai-hero-icon) {
-  animation: 0.85s cubic-bezier(0.22, 1, 0.36, 1) both ai-hero-fade-out;
-  transform-origin: center;
-}
-
-::view-transition-new(ai-hero-icon) {
-  animation: 0.85s cubic-bezier(0.22, 1, 0.36, 1) both ai-hero-fade-in;
-  transform-origin: center;
-}
-
-@keyframes ai-hero-fade-out {
-  0% { 
-    opacity: 1; 
-    transform: scale(1) translateY(0); 
-    filter: blur(0); 
-  }
-  25% { 
-    opacity: 0; 
-    transform: scale(0.6) translateY(12px); 
-    filter: blur(10px); 
-  }
-  100% { 
-    opacity: 0; 
-  }
-}
-
-@keyframes ai-hero-fade-in {
-  0% { 
-    opacity: 0; 
-    transform: scale(1.8) translateY(-25px); 
-    filter: blur(16px); 
-  }
-  35% { 
-    opacity: 1; 
-    transform: scale(1.1) translateY(-6px); 
-    filter: blur(0); 
-  }
-  100% { 
-    opacity: 1; 
-    transform: scale(1) translateY(0); 
-    filter: blur(0); 
-  }
-}
 </style>

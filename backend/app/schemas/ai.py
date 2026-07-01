@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 
 class GenerateResumeRequest(BaseModel):
     target_position: str
+    language: str = "zh-CN"
     personal_info: str = ""
     basics: dict[str, Any] = Field(default_factory=dict)
     education: str = ""
@@ -19,12 +20,14 @@ class GenerateResumeRequest(BaseModel):
 
 
 class ScoreResumeRequest(BaseModel):
+    resume_id: Optional[int] = None
     resume_data: dict[str, Any]
     target_position: str = ""
     job_description: str = ""
 
 
 class OptimizeSectionRequest(BaseModel):
+    resume_id: Optional[int] = None
     section_type: str
     section_title: str
     section_content: Any
@@ -34,24 +37,14 @@ class OptimizeSectionRequest(BaseModel):
     optimize_style: str = "更专业"
 
 
-class OptimizeResumeRequest(BaseModel):
-    resume_data: dict[str, Any]
-    target_position: str = ""
-    job_description: str = ""
-    optimize_style: str = "更适合技术岗"
-
-
 class JdOptimizeRequest(BaseModel):
+    resume_id: Optional[int] = None
     resume_data: dict[str, Any]
     job_description: str
 
 
-class SummaryGenerateRequest(BaseModel):
+class TranslateResumeRequest(BaseModel):
+    resume_id: Optional[int] = None
     resume_data: dict[str, Any]
-    target_position: str = ""
-
-
-class ProjectOptimizeRequest(BaseModel):
-    project: dict[str, Any]
-    target_position: str = ""
-    job_description: str = ""
+    current_language: str = "zh-CN"
+    target_language: Literal["zh-CN", "en"]

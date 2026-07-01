@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     app_port: int = 8000
     app_debug: bool = True
 
+    log_level: str = "INFO"
+    uvicorn_log_level: str = "INFO"
+    sqlalchemy_log_level: str = "WARNING"
+    log_access_enabled: bool = True
+    log_file: str = ""
+    log_file_max_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+    log_file_backup_count: int = Field(default=5, ge=0)
+
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     db_host: str = "127.0.0.1"
@@ -22,9 +30,15 @@ class Settings(BaseSettings):
     db_name: str = "vitaflow"
     db_charset: str = "utf8mb4"
 
+    redis_url: str = "redis://127.0.0.1:6379/0"
+    redis_key_prefix: str = "vitaflow"
+    redis_socket_timeout: int = Field(default=3, gt=0)
+    announcement_cache_ttl_seconds: int = Field(default=600, gt=0)
+
     jwt_secret_key: str = "please_change_this_secret_key"
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 1440
+    admin_emails: str = ""
 
     smtp_host: str = ""
     smtp_port: int = 465
@@ -35,14 +49,20 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = True
     smtp_use_tls: bool = False
     smtp_timeout: int = 10
-    email_code_expire_minutes: int = 10
-    email_code_send_interval_seconds: int = 60
+    email_code_expire_minutes: int = Field(default=10, gt=0)
+    email_code_send_interval_seconds: int = Field(default=60, gt=0)
+    email_code_register_lock_seconds: int = Field(default=30, gt=0)
 
     ai_api_key: str = ""
     ai_base_url: str = "https://api.deepseek.com/v1"
     ai_model: str = "deepseek-chat"
     ai_temperature: float = 0.7
     ai_timeout: int = 60
+    ai_max_tokens: int = Field(default=8192, gt=0)
+    ai_chat_change_timeout: int = Field(default=180, gt=0)
+    ai_model_io_log_enabled: bool = True
+    ai_model_io_log_path: str = "logs/ai_model_io.log"
+    ai_model_io_log_max_chars: int = Field(default=200000, gt=0)
 
     storage_provider: str = "minio"
     storage_public_url_mode: str = "proxy"
@@ -81,6 +101,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
+
+    @property
+    def admin_email_list(self) -> list[str]:
+        return [item.strip().lower() for item in self.admin_emails.split(",") if item.strip()]
 
     @property
     def backend_root(self) -> Path:

@@ -27,5 +27,5 @@ function onInput(event: Event) {
 }
 </script>
 <template>
-  <textarea ref="textareaRef" :rows="rows || 5" :value="modelValue" :placeholder="placeholder" class="w-full resize-none rounded-md border border-zinc-200 bg-white px-3 py-2 text-[14px] leading-relaxed text-zinc-800 outline-none transition-all placeholder:text-zinc-400 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm" style="overflow: hidden;" @input="onInput" />
+  <textarea ref="textareaRef" :rows="rows || 5" :value="modelValue" :placeholder="placeholder" class="w-full resize-none rounded-xl border border-zinc-200 bg-white px-3.5 py-2.5 text-[14px] leading-relaxed text-zinc-800 outline-none transition-colors placeholder:text-zinc-400 hover:border-zinc-300 focus:border-zinc-500" style="overflow: hidden;" @input="onInput" />
 </template>

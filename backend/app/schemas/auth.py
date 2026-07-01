@@ -44,6 +44,9 @@ class UserOut(BaseModel):
     username: str
     email: str
     avatar_url: Optional[str] = None
+    role: str = "user"
+    status: str = "active"
+    flow_points: float = 0
 
     model_config = {"from_attributes": True}
 
@@ -56,6 +59,19 @@ class TokenOut(BaseModel):
 
 class SendVerificationCodeRequest(BaseModel):
     email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class ResetPasswordRequest(BaseModel):
+    email: str = Field(pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    verification_code: str = Field(pattern=r"^\d{6}$")
+    new_password: str = Field(min_length=6, max_length=100)
+
+    @field_validator("new_password")
+    @classmethod
+    def password_fits_bcrypt(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("密码过长，bcrypt 最多支持 72 字节")
+        return value
 
 
 class UpdateProfileRequest(BaseModel):

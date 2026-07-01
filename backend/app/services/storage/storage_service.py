@@ -135,6 +135,66 @@ def upload_avatar(db: Session, user_id: int, file: UploadFile) -> dict[str, str]
     return {"url": url, "object_name": object_name, "provider": _provider()}
 
 
+def upload_announcement_image(db: Session, user_id: int, file: UploadFile) -> dict[str, str]:
+    if file.content_type not in ALLOWED_TYPES:
+        raise AppException("公告图片仅支持 jpg、jpeg、png、webp")
+    content = file.file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise AppException("公告图片不能超过 5MB")
+
+    suffix = ALLOWED_TYPES[file.content_type]
+    object_name = f"announcement/{uuid4().hex}{suffix}"
+    if _provider() == "aliyun_oss":
+        _upload_aliyun_oss(object_name, content, file.content_type)
+    else:
+        _upload_minio(object_name, content, file.content_type)
+
+    url = _file_url(object_name)
+    db.add(
+        UploadedFile(
+            user_id=user_id,
+            file_type="announcement_image",
+            file_name=file.filename or object_name,
+            object_name=object_name,
+            file_url=url,
+            content_type=file.content_type,
+            file_size=len(content),
+        )
+    )
+    db.commit()
+    return {"url": url, "object_name": object_name, "provider": _provider()}
+
+
+def upload_ai_chat_image(db: Session, user_id: int, file: UploadFile) -> dict[str, str]:
+    if file.content_type not in ALLOWED_TYPES:
+        raise AppException("AI 对话图片仅支持 jpg、jpeg、png、webp")
+    content = file.file.read()
+    if len(content) > 5 * 1024 * 1024:
+        raise AppException("AI 对话图片不能超过 5MB")
+
+    suffix = ALLOWED_TYPES[file.content_type]
+    object_name = f"ai-chat/{user_id}_{uuid4().hex}{suffix}"
+    if _provider() == "aliyun_oss":
+        _upload_aliyun_oss(object_name, content, file.content_type)
+    else:
+        _upload_minio(object_name, content, file.content_type)
+
+    url = _file_url(object_name)
+    db.add(
+        UploadedFile(
+            user_id=user_id,
+            file_type="ai_chat_image",
+            file_name=file.filename or object_name,
+            object_name=object_name,
+            file_url=url,
+            content_type=file.content_type,
+            file_size=len(content),
+        )
+    )
+    db.commit()
+    return {"url": url, "object_name": object_name, "provider": _provider()}
+
+
 def _iter_oss_object(obj) -> Iterator[bytes]:
     try:
         while True:

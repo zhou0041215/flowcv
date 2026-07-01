@@ -2,10 +2,22 @@
 import { ref, computed } from "vue"
 import { Plus, Trash2, ChevronDown, ChevronRight, GripVertical, FileEdit, ArrowUp, ArrowDown } from "lucide-vue-next"
 import Button from "@/components/ui/button/Button.vue"
+import ConfirmDialog from "@/components/ui/dialog/ConfirmDialog.vue"
 import SectionFields from "./SectionFields.vue"
 
-const props = defineProps<{ sectionKey: string; items: any[]; isWide?: boolean }>()
-const emit = defineEmits<{ change: [] }>()
+const props = defineProps<{
+  sectionKey: string
+  items: any[]
+  isWide?: boolean
+  displayFieldLabels?: Record<string, string>
+  editableDisplayFields?: string[]
+  customizedDisplayFields?: string[]
+}>()
+const emit = defineEmits<{
+  change: []
+  updateFieldLabel: [fieldKey: string, value: string]
+  resetFieldLabel: [fieldKey: string]
+}>()
 
 const activeItemId = ref<string | null>(null)
 
@@ -25,12 +37,25 @@ function moveItem(index: number, direction: -1 | 1) {
   emit("change")
 }
 
+const showDeleteConfirm = ref(false)
+const deletingItemIndex = ref<number | null>(null)
+
 function deleteItem(index: number) {
-  props.items.splice(index, 1)
-  if (activeItemId.value && !props.items.find((i: any) => i.id === activeItemId.value)) {
-    activeItemId.value = null
+  deletingItemIndex.value = index
+  showDeleteConfirm.value = true
+}
+
+function confirmDeleteItem() {
+  if (deletingItemIndex.value !== null) {
+    const deletedId = props.items[deletingItemIndex.value]?.id
+    props.items.splice(deletingItemIndex.value, 1)
+    if (activeItemId.value === deletedId) {
+      activeItemId.value = ""
+    }
+    emit("change")
   }
-  emit("change")
+  showDeleteConfirm.value = false
+  deletingItemIndex.value = null
 }
 
 function addItem() {
@@ -85,7 +110,7 @@ const activeItem = computed(() => props.items.find(i => i.id === activeItemId.va
             <div class="text-[12px] text-zinc-500 truncate mt-0.5">{{ getItemSubtitle(item) }}</div>
           </div>
           
-          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" @click.stop>
+          <div class="flex items-center gap-1 transition-opacity shrink-0" :class="activeItemId === item.id ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none sm:group-hover:opacity-100 sm:group-hover:pointer-events-auto'" @click.stop>
             <Button size="icon" variant="ghost" class="h-7 w-7 text-zinc-400 hover:text-zinc-700" :disabled="index === 0" @click="moveItem(index, -1)">
               <ArrowUp class="h-3.5 w-3.5" />
             </Button>
@@ -98,15 +123,27 @@ const activeItem = computed(() => props.items.find(i => i.id === activeItemId.va
           </div>
           
           <!-- State indicator for narrow mode -->
-          <div v-if="!isWide" class="group-hover:hidden text-zinc-400">
-            <ChevronDown v-if="activeItemId === item.id" class="h-4 w-4" />
-            <ChevronRight v-else class="h-4 w-4" />
+          <div v-if="!isWide && activeItemId !== item.id" class="sm:group-hover:hidden text-zinc-400">
+            <ChevronRight class="h-4 w-4" />
           </div>
         </div>
 
         <!-- Inline Form (Narrow Mode) -->
         <div v-if="!isWide && activeItemId === item.id" class="mt-2 rounded-[16px] border border-zinc-200/80 bg-white shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-          <SectionFields :item="item" :section-key="sectionKey" @change="$emit('change')" />
+          <SectionFields
+            :item="item"
+            :section-key="sectionKey"
+            :display-field-labels="displayFieldLabels"
+            :editable-display-fields="editableDisplayFields"
+            :customized-display-fields="customizedDisplayFields"
+            @change="$emit('change')"
+            @update-field-label="(key, value) => emit('updateFieldLabel', key, value)"
+            @reset-field-label="(key) => emit('resetFieldLabel', key)"
+          >
+            <template v-for="(_, name) in $slots" #[name]="slotProps">
+              <slot :name="name" v-bind="slotProps"></slot>
+            </template>
+          </SectionFields>
         </div>
       </div>
 
@@ -121,7 +158,20 @@ const activeItem = computed(() => props.items.find(i => i.id === activeItemId.va
         <div class="px-6 py-4 border-b border-zinc-100 bg-zinc-50/50">
           <h3 class="text-sm font-semibold text-zinc-800 tracking-tight">编辑: {{ getItemTitle(activeItem) }}</h3>
         </div>
-        <SectionFields :item="activeItem" :section-key="sectionKey" @change="$emit('change')" />
+        <SectionFields
+          :item="activeItem"
+          :section-key="sectionKey"
+          :display-field-labels="displayFieldLabels"
+          :editable-display-fields="editableDisplayFields"
+          :customized-display-fields="customizedDisplayFields"
+          @change="$emit('change')"
+          @update-field-label="(key, value) => emit('updateFieldLabel', key, value)"
+          @reset-field-label="(key) => emit('resetFieldLabel', key)"
+        >
+          <template v-for="(_, name) in $slots" #[name]="slotProps">
+            <slot :name="name" v-bind="slotProps"></slot>
+          </template>
+        </SectionFields>
       </div>
       <div v-else class="flex flex-col items-center justify-center py-24 text-zinc-400 border border-dashed rounded-[20px] border-zinc-200 bg-zinc-50/50">
          <div class="h-16 w-16 bg-white rounded-full flex items-center justify-center shadow-sm border border-zinc-100 mb-4">
@@ -130,7 +180,13 @@ const activeItem = computed(() => props.items.find(i => i.id === activeItemId.va
          <span class="text-[15px] font-medium text-zinc-500">在左侧选择一个条目进行编辑</span>
          <span class="text-[13px] text-zinc-400 mt-1">或点击下方按钮添加新条目</span>
       </div>
-    </div>
-
   </div>
+  </div>
+
+  <ConfirmDialog 
+    v-model:open="showDeleteConfirm" 
+    title="确认删除该条目吗？" 
+    description="删除后将无法恢复。" 
+    @confirm="confirmDeleteItem" 
+  />
 </template>

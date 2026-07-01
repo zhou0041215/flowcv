@@ -32,6 +32,14 @@ function adviceList() {
 const diffItems = computed(() => (props.preview ? diffSection(props.sectionKey, props.currentValue, props.preview, props.sectionTitle) : []))
 const diffSections = computed(() => (diffItems.value.length ? [{ key: props.sectionKey, title: props.sectionTitle, changes: diffItems.value }] : []))
 const changeCount = computed(() => diffItems.value.length)
+const noChangeMessage = computed(() => {
+  const advice = adviceList()
+  if (advice.length) return advice.slice(0, 2)
+  return [
+    "这个模块当前表达已经比较完整，AI 没有发现值得直接写入的实质改动。",
+    "系统没有强行制造修改；如果你想换一种风格，可以补充目标岗位或希望突出的方向后重新润色。",
+  ]
+})
 
 function applyReview() {
   reviewOpen.value = false
@@ -52,14 +60,18 @@ function applyReview() {
         <div>
           <h3 class="font-semibold text-zinc-900">{{ changeCount ? `${sectionTitle}润色结果` : `${sectionTitle}暂无可采纳变化` }}</h3>
           <p class="mt-1 text-xs leading-5 text-zinc-500">
-            {{ changeCount ? '已生成当前模块的优化方案，打开变更审阅后可查看完整变化。' : 'AI 没有生成与当前内容不同的可写入版本，可重新润色或关闭结果。' }}
+            {{ changeCount ? '已生成当前模块的优化方案，打开变更审阅后可查看完整变化。' : '这部分已经比较稳了，AI 没有发现需要直接写入的实质改动。' }}
           </p>
         </div>
         <span v-if="changeCount" class="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-medium text-blue-600">{{ changeCount }} 项变化</span>
+        <span v-else class="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">无需修改</span>
       </div>
 
       <ul v-if="changeCount && adviceList().length" class="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-zinc-600">
         <li v-for="item in adviceList().slice(0, 3)" :key="item">{{ item }}</li>
+      </ul>
+      <ul v-else-if="!changeCount" class="mt-3 space-y-2 text-sm leading-6 text-zinc-600">
+        <li v-for="item in noChangeMessage" :key="item" class="rounded-lg bg-white/70 px-3 py-2 ring-1 ring-zinc-100">{{ item }}</li>
       </ul>
 
       <div class="mt-4 flex flex-wrap gap-2">

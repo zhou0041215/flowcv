@@ -64,8 +64,8 @@ export function createResumePaginationScript() {
             '.timeline-sub',
             '.timeline-tech',
             '.tag-row',
-            '.markdown-body p',
-            '.markdown-body li'
+            '.rich-text-body p',
+            '.rich-text-body li'
           ].join(',');
           var targets = Array.prototype.slice.call(document.querySelectorAll(selector));
           targets.forEach(function (el) { el.style.marginTop = ''; });

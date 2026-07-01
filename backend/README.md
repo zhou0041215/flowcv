@@ -38,10 +38,25 @@ source .venv/bin/activate
 pip install -r requirements.txt
 python -m playwright install --with-deps chromium
 cp .env.example .env
-alembic revision --autogenerate -m "init"
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+## 日志配置
+
+后端启动时会初始化统一日志配置，默认输出到控制台，并记录应用启动、关闭、请求耗时和未处理异常堆栈。
+
+```env
+LOG_LEVEL=INFO
+UVICORN_LOG_LEVEL=INFO
+SQLALCHEMY_LOG_LEVEL=WARNING
+LOG_ACCESS_ENABLED=true
+LOG_FILE=
+LOG_FILE_MAX_BYTES=10485760
+LOG_FILE_BACKUP_COUNT=5
+```
+
+常用日志级别为 `DEBUG`、`INFO`、`WARNING`、`ERROR`、`CRITICAL`。如果需要落盘，将 `LOG_FILE` 设置为相对后端目录或绝对路径，例如 `LOG_FILE=logs/backend.log`；日志文件会按 `LOG_FILE_MAX_BYTES` 和 `LOG_FILE_BACKUP_COUNT` 自动轮转。
 
 如果服务器不能使用 Playwright 自动安装浏览器，也可以安装系统 Chromium，并配置：
 
@@ -57,9 +72,11 @@ macOS 本地开发建议保持 `PDF_CHROMIUM_EXECUTABLE_PATH` 为空，让 Playw
 
 - 所有接口以 `/api` 开头，统一响应 `{ code, message, data }`。
 - MySQL 表不使用物理外键，简历主体和模板配置使用 JSON 字段。
+- 注册验证码、发送限频和并发注册锁存储在 Redis，并通过 TTL 自动过期。
 - `preview_service` 用 Jinja2 渲染 HTML，预览和 PDF 导出共用该服务。
 - Markdown 由 `markdown` 转 HTML，并用 `bleach` 清理。
 - AI 调用通过 LangChain 和 LangGraph 封装，未配置 `AI_API_KEY` 时直接报错。
+- 简历翻译通过独立 AI 任务执行，保持模块结构、事实字段和富文本格式，并由 Flow Points 规则单独计费。
 - 头像存储通过统一存储服务封装，`STORAGE_PROVIDER=minio` 使用 MinIO，`STORAGE_PROVIDER=aliyun_oss` 使用阿里云 OSS。
 
 ## 对象存储

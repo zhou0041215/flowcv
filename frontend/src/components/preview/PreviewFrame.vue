@@ -39,9 +39,11 @@ let dragStartX = 0
 let dragStartY = 0
 let dragStartScrollLeft = 0
 let dragStartScrollTop = 0
+let lastScrollerWidth = 0
 
 function handleViewportChange() {
   scheduleUpdatePageCount([0, 120, 360])
+  void centerHorizontal()
 }
 
 function clearPendingTimers() {
@@ -156,8 +158,29 @@ function getMeasuredContentHeight(doc: Document, page: HTMLElement, metrics: Pag
     contentBottom = Math.max(contentBottom, rect.bottom - pageRect.top)
   })
 
-  // buildPageSlices removes the first-page bottom margin before comparing the
-  // result with the printable boundary, so append it to the measured content.
+  // Some rich-text blocks contain direct text alongside child elements. Range
+  // rectangles capture those text nodes without counting structural grid
+  // borders or wrapper padding as printable content.
+  const walker = doc.createTreeWalker(page, NodeFilter.SHOW_TEXT)
+  let textNode = walker.nextNode()
+  while (textNode) {
+    if (textNode.textContent?.trim()) {
+      const parent = textNode.parentElement
+      const style = parent ? view.getComputedStyle(parent) : null
+      if (!style || (style.display !== "none" && style.visibility !== "hidden")) {
+        const range = doc.createRange()
+        range.selectNodeContents(textNode)
+        Array.from(range.getClientRects()).forEach((rect) => {
+          if (rect.width > 0 && rect.height > 0) {
+            contentBottom = Math.max(contentBottom, rect.bottom - pageRect.top)
+          }
+        })
+        range.detach()
+      }
+    }
+    textNode = walker.nextNode()
+  }
+
   return Math.max(contentBottom, 0) + metrics.firstBottomPx
 }
 
@@ -196,7 +219,7 @@ function buildPageSlices(contentHeight: number, metrics: PageMetrics): PageSlice
 function updatePageCount() {
   const frame = measureFrame.value
   const doc = frame?.contentDocument
-  if (!frame || !doc || !isScrollerVisible()) return
+  if (!frame || !doc || !doc.body || !isScrollerVisible()) return
   const pageHeight = pageHeightPx(doc)
   const page = doc.querySelector(".resume-page") as HTMLElement | null
   if (!pageHeight || !page) return
@@ -282,8 +305,9 @@ function stopDrag(event: PointerEvent) {
 
 async function centerHorizontal() {
   await nextTick()
+  await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
   const el = scroller.value
-  if (!el) return
+  if (!el || el.clientWidth <= 0) return
   el.scrollLeft = Math.max((el.scrollWidth - el.clientWidth) / 2, 0)
 }
 
@@ -305,7 +329,14 @@ watch(
 )
 
 onMounted(() => {
-  outerResizeObserver = new ResizeObserver(() => scheduleUpdatePageCount([0, 120, 360]))
+  outerResizeObserver = new ResizeObserver(() => {
+    scheduleUpdatePageCount([0, 120, 360])
+    const width = scroller.value?.clientWidth || 0
+    if (width > 0 && width !== lastScrollerWidth) {
+      lastScrollerWidth = width
+      void centerHorizontal()
+    }
+  })
   if (scroller.value) outerResizeObserver.observe(scroller.value)
   window.addEventListener("resize", handleViewportChange)
   window.addEventListener("orientationchange", handleViewportChange)
@@ -344,17 +375,25 @@ onBeforeUnmount(() => {
       :srcdoc="patchHtml()"
       @load="onMeasureLoad"
     />
-    <div class="preview-page-rail">
-      <div v-for="page in pageSlices" :key="page.index" class="relative overflow-hidden bg-white shadow-xl" :style="shellStyle">
-        <div class="absolute left-0 overflow-hidden" :style="pageViewportStyle(page)">
-          <iframe
-            class="pointer-events-none origin-top-left border-0 bg-white"
-            scrolling="no"
-            :srcdoc="patchHtml(page)"
-            :style="{ width: '210mm', height: '297mm', transform: `scale(${scale})` }"
-          />
+    <div class="preview-page-rail" :style="{ gap: `${12 * scale}px` }">
+      <template v-for="(page, i) in pageSlices" :key="page.index">
+        <div v-if="i > 0" class="pointer-events-none flex select-none items-center justify-center text-gray-400/50 tracking-wider" :style="{ fontSize: `${11 * scale}px` }">
+          <svg class="mr-1" :style="{ width: `${14 * scale}px`, height: `${14 * scale}px` }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Tips: 如果分页内容被截断，可在设置中调整「边距」或「行高」
         </div>
-      </div>
+        <div class="relative overflow-hidden bg-white shadow-xl" :style="shellStyle">
+          <div class="absolute left-0 overflow-hidden" :style="pageViewportStyle(page)">
+            <iframe
+              class="pointer-events-none origin-top-left border-0 bg-white"
+              scrolling="no"
+              :srcdoc="patchHtml(page)"
+              :style="{ width: '210mm', height: '297mm', transform: `scale(${scale})` }"
+            />
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -366,7 +405,6 @@ onBeforeUnmount(() => {
   min-width: max-content;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
 }
 
 @supports (width: max(1px, 2px)) {

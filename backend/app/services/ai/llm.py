@@ -1,16 +1,16 @@
 from langchain_openai import ChatOpenAI
 
-from app.core.config import settings
-from app.core.exceptions import AppException
+from app.services.ai_config_service import get_active_ai_config
 
 
-def get_llm() -> ChatOpenAI:
-    if not settings.ai_api_key:
-        raise AppException("未配置大模型 API KEY，请在 .env 中配置 AI_API_KEY")
+def get_llm(timeout: int | None = None) -> ChatOpenAI:
+    config = get_active_ai_config()
+    request_timeout = max(int(config.timeout or 0), int(timeout or 0)) if timeout else config.timeout
     return ChatOpenAI(
-        api_key=settings.ai_api_key,
-        base_url=settings.ai_base_url,
-        model=settings.ai_model,
-        temperature=settings.ai_temperature,
-        timeout=settings.ai_timeout,
+        api_key=config.api_key,
+        base_url=config.base_url,
+        model=config.model,
+        temperature=config.temperature,
+        timeout=request_timeout,
+        max_tokens=config.max_tokens,
     )

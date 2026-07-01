@@ -1,12 +1,16 @@
 {% set basics = resume.basics or {} %}
+{% set avatar_position = config.avatar_position if config.avatar_position in ['left', 'center', 'right'] else 'right' %}
 {% import 'resume/partials/icons.html' as icons %}
 {% macro meta_icon(name) -%}
-  {% set color = basics_icon_color|default(config.icon_color or config.theme_color or '#2563eb') %}
+  {% set color = config.icon_color or config.theme_color or '#2563eb' %}
   {{ icons.resume_icon(name, 'meta-icon', color)|safe }}
 {%- endmacro %}
-<header class="resume-header">
+<header class="resume-header resume-avatar-{{ avatar_position }}">
+  {% if config.show_avatar and basics.avatar and avatar_position in ['left', 'center'] %}
+    <div class="resume-avatar-cell"><img class="resume-avatar" src="{{ basics.avatar }}" alt="{{ resume._labels.avatar_alt }}"></div>
+  {% endif %}
   <div class="resume-header-main">
-    <h1 class="resume-name">{{ basics.name or '未命名' }}</h1>
+    <h1 class="resume-name">{{ basics.name or resume._labels.unnamed }}</h1>
     <div class="resume-position">{{ basics.title or '' }}</div>
     {% for row in [1, 2, 3, 4] %}
       {% set ns = namespace(has=false) %}
@@ -36,7 +40,7 @@
       {% endif %}
     {% endfor %}
   </div>
-  {% if config.show_avatar and basics.avatar %}
-    <div class="resume-avatar-cell"><img class="resume-avatar" src="{{ basics.avatar }}" alt="头像"></div>
+  {% if config.show_avatar and basics.avatar and avatar_position == 'right' %}
+    <div class="resume-avatar-cell"><img class="resume-avatar" src="{{ basics.avatar }}" alt="{{ resume._labels.avatar_alt }}"></div>
   {% endif %}
 </header>

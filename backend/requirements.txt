@@ -3,6 +3,7 @@ uvicorn[standard]
 sqlalchemy
 alembic
 pymysql
+redis>=5.0
 pydantic
 pydantic-settings
 python-dotenv
@@ -11,10 +12,12 @@ passlib[bcrypt]
 bcrypt==4.0.1
 python-multipart
 python-docx
+pypdf
+Pillow
+pytesseract
 jinja2
 weasyprint
 playwright
-markdown
 bleach
 minio
 oss2

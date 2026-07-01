@@ -23,7 +23,7 @@
   --body-font-size: {{ config.body_font_size or 13 }}px;
   --body-font-color: {{ config.body_font_color or '#374151' }};
   --icon-color: {{ config.icon_color or config.theme_color or '#2563eb' }};
-  --header-icon-color: {{ config.header_icon_color or '#ffffff' }};
+  --header-icon-color: {{ config.icon_color or config.theme_color or '#2563eb' }};
   --line-height: {{ config.line_height or 1.6 }};
   --page-margin-top: {{ page_margin_top }};
   --page-margin-right: {{ page_margin_right }};
@@ -54,7 +54,7 @@ body {
   min-height: 297mm;
   margin: 0 auto;
   padding: calc(var(--page-margin-top) * 1mm) calc(var(--page-margin-right) * 1mm) calc(var(--page-margin-bottom) * 1mm) calc(var(--page-margin-left) * 1mm);
-  background: white;
+  background: {{ config.bg_color or 'white' }};
 }
 .resume-header {
   display: table;
@@ -107,11 +107,44 @@ body {
   vertical-align: top;
   text-align: right;
 }
+.resume-page .resume-header.resume-avatar-left .resume-avatar-cell {
+  padding-right: 8mm;
+  padding-left: 0;
+  vertical-align: middle;
+  text-align: left;
+}
+.resume-page .resume-header.resume-avatar-left {
+  align-items: center;
+}
+.resume-page .resume-header.resume-avatar-left .resume-avatar {
+  margin-top: 0;
+}
+.resume-page .resume-header.resume-avatar-center {
+  display: block;
+  text-align: center;
+}
+.resume-page .resume-header.resume-avatar-center .resume-header-main {
+  display: block;
+  width: auto;
+}
+.resume-page .resume-header.resume-avatar-center .resume-avatar-cell {
+  display: block;
+  width: auto;
+  padding: 0 0 4mm;
+  text-align: center;
+}
+.resume-page .resume-header.resume-avatar-center .resume-meta {
+  justify-content: center;
+}
+.resume-page .resume-header.resume-avatar-center .resume-avatar {
+  margin-top: 0;
+}
 .resume-avatar {
   width: 24mm;
   height: 32mm;
   margin-top: -2mm;
   object-fit: cover;
+  object-position: center top;
   border-radius: 6px;
 }
 .section {
@@ -158,6 +191,29 @@ body {
   border-radius: 999px;
   padding: 1px 7px;
 }
-.markdown-body p { margin: 3px 0; }
-.markdown-body ul, .markdown-body ol { margin: 3px 0 3px 18px; padding: 0; }
-.markdown-body li { margin: 2px 0; break-inside: avoid; page-break-inside: avoid; }
+.skill-inline {
+  margin: 3px 0;
+}
+.skill-inline strong {
+  color: #111827;
+}
+.resume-page .section-skills .experience-item {
+  margin-bottom: 5px;
+}
+.resume-page .section-skills .tag-row {
+  margin: 2px 0 3px;
+}
+.resume-page .section-skills .skill-inline {
+  margin: 1px 0 2px;
+}
+.resume-page .section-skills .rich-text-body p {
+  margin: 2px 0;
+}
+.rich-text-body p { margin: 3px 0; }
+.rich-text-body h1, .rich-text-body h2, .rich-text-body h3, .rich-text-body h4 { margin: 5px 0 3px; line-height: 1.3; }
+.rich-text-body h1, .rich-text-body h2 { font-size: 1.18em; }
+.rich-text-body h3, .rich-text-body h4 { font-size: 1.08em; }
+.rich-text-body ul, .rich-text-body ol { margin: 3px 0 3px 18px; padding: 0; }
+.rich-text-body li { margin: 2px 0; break-inside: avoid; page-break-inside: avoid; }
+.rich-text-body blockquote { margin: 4px 0; padding-left: 8px; border-left: 2px solid #d1d5db; color: #6b7280; }
+.rich-text-body a { color: var(--theme-color); text-decoration: underline; }

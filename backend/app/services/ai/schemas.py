@@ -1,10 +1,11 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
 
 class ResumeGenerateResult(BaseModel):
     resume_data: dict[str, Any]
+    language: Literal["zh-CN", "en"] = "zh-CN"
     template_id: str = "tech"
     template_config: dict[str, Any] = Field(default_factory=dict)
     explanation: str = ""
@@ -34,19 +35,6 @@ class SectionOptimizeResult(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
 
 
-class ProjectOptimizeResult(BaseModel):
-    optimized_project: dict[str, Any]
-    changes: list[str] = Field(default_factory=list)
-    suggestions: list[str] = Field(default_factory=list)
-
-
-class ResumeOptimizeResult(BaseModel):
-    optimized_resume_data: dict[str, Any]
-    summary: str = ""
-    changes: list[str] = Field(default_factory=list)
-    suggestions: list[str] = Field(default_factory=list)
-
-
 class JdOptimizeResult(BaseModel):
     job_keywords: dict[str, Any] = Field(default_factory=dict)
     match_analysis: dict[str, Any] = Field(default_factory=dict)
@@ -55,12 +43,26 @@ class JdOptimizeResult(BaseModel):
     suggestions: list[str] = Field(default_factory=list)
 
 
-class SummaryGenerateResult(BaseModel):
-    content: str
-    suggestions: list[str] = Field(default_factory=list)
+class ResumeTranslateResult(BaseModel):
+    source_language: Literal["zh-CN", "en"]
+    target_language: Literal["zh-CN", "en"]
+    translated_resume_data: dict[str, Any]
+    translated_sections: list[str] = Field(default_factory=list)
+    summary: str = ""
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ResumeChatResult(BaseModel):
+    intent: Literal["answer", "clarify", "propose_change", "confirm_change", "reject_change"]
+    change_scope: Literal["none", "partial", "full_replace", "reorder"]
+    target_sections: list[Literal["basics", "summary", "education", "skills", "work", "projects", "awards", "custom_sections", "layout"]] = Field(default_factory=list)
     reply: str
     suggestions: list[str] = Field(default_factory=list)
     optimized_resume_data: dict[str, Any] | None = None
+
+
+class ResumeChatIntentResult(BaseModel):
+    intent: Literal["answer", "clarify", "propose_change", "confirm_change", "reject_change"]
+    change_scope: Literal["none", "partial", "full_replace", "reorder"] = "none"
+    target_sections: list[Literal["basics", "summary", "education", "skills", "work", "projects", "awards", "custom_sections", "layout"]] = Field(default_factory=list)
+    reply_hint: str = ""

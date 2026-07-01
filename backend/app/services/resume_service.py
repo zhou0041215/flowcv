@@ -1,13 +1,27 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AppException
 from app.models.resume import Resume, ResumeVersion
 from app.schemas.resume import ResumeCreate, ResumeUpdate, default_template_config
+from app.services.resume_locale import normalize_resume_language
 
 
-def list_resumes(db: Session, user_id: int) -> list[Resume]:
-    return list(db.scalars(select(Resume).where(Resume.user_id == user_id).order_by(Resume.update_time.desc())))
+def list_resumes(db: Session, user_id: int, page: int = 1, page_size: int = 8) -> tuple[list[Resume], int]:
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 48)
+    filters = Resume.user_id == user_id
+    total = db.scalar(select(func.count()).select_from(Resume).where(filters)) or 0
+    items = list(
+        db.scalars(
+            select(Resume)
+            .where(filters)
+            .order_by(Resume.update_time.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+    )
+    return items, total
 
 
 def get_resume(db: Session, user_id: int, resume_id: int) -> Resume:
@@ -23,7 +37,7 @@ def create_resume(db: Session, user_id: int, payload: ResumeCreate) -> Resume:
     resume = Resume(
         user_id=user_id,
         title=payload.title,
-        language=payload.language,
+        language=normalize_resume_language(payload.language),
         resume_data=payload.resume_data,
         template_id=payload.template_id,
         template_config=config,
@@ -39,6 +53,8 @@ def create_resume(db: Session, user_id: int, payload: ResumeCreate) -> Resume:
 def update_resume(db: Session, user_id: int, resume_id: int, payload: ResumeUpdate) -> Resume:
     resume = get_resume(db, user_id, resume_id)
     data = payload.model_dump(exclude_unset=True)
+    if "language" in data:
+        data["language"] = normalize_resume_language(data["language"])
     if "template_id" in data and data["template_id"]:
         data.setdefault("template_config", resume.template_config or {})
         data["template_config"]["template_id"] = data["template_id"]

@@ -5,10 +5,17 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import ValidationError
 
 from app.core.exceptions import AppException
-from app.services.ai.chains import _normalize_resume_data, _parse_json_content, _repair_json_content, _safe_int
+from app.services.ai.chains import (
+    _merge_section_content,
+    _normalize_resume_data,
+    _parse_json_content,
+    _repair_json_content,
+    _safe_int,
+)
 from app.services.ai.llm import get_llm
 from app.services.ai.prompts import JD_NODE_PROMPT
 from app.services.ai.schemas import JdOptimizeResult
+from app.services.ai.token_usage import record_model_output, record_prompt_input
 
 
 class JdOptimizeState(TypedDict, total=False):
@@ -23,8 +30,11 @@ class JdOptimizeState(TypedDict, total=False):
 
 def _node_json(task: str, state: JdOptimizeState) -> dict[str, Any]:
     chain = JD_NODE_PROMPT | get_llm()
-    message = chain.invoke({"task": task, "input_json": _json_dumps(state)})
+    variables = {"task": task, "input_json": _json_dumps(state)}
+    record_prompt_input(JD_NODE_PROMPT, variables, f"JD 优化节点：{task[:24]}")
+    message = chain.invoke(variables)
     content = getattr(message, "content", message)
+    record_model_output(content, f"JD 优化节点：{task[:24]}")
     try:
         return _parse_json_content(content)
     except Exception:
@@ -76,43 +86,80 @@ def _string_list(value: Any) -> list[str]:
 
 
 def analyze_jd_node(state: JdOptimizeState) -> JdOptimizeState:
-    return {"job_keywords": _node_json("分析岗位 JD，提取岗位名称、技能关键词、职责关键词、加分项。", state)}
+    return {
+        "job_keywords": _node_json(
+            "只分析岗位 JD，返回目标岗位、核心技能、核心职责、加分项、硬性条件；去除招聘套话，不修改简历。",
+            state,
+        )
+    }
 
 
 def analyze_resume_node(state: JdOptimizeState) -> JdOptimizeState:
-    return {"match_analysis": _node_json("分析当前简历与 JD 的匹配度，找出缺失关键词和弱项。", state)}
+    return {
+        "match_analysis": _node_json(
+            "对照 JD 与当前简历的事实证据，分别返回已匹配、部分匹配、缺失证据和潜在风险；不得把 JD 要求视为候选人能力。",
+            state,
+        )
+    }
 
 
 def optimize_skills_node(state: JdOptimizeState) -> JdOptimizeState:
     data = deepcopy(state["optimized_resume_data"])
-    result = _node_json("只优化 skills 模块，保持 JSON 结构，返回 skills 数组。", state)
-    data["skills"] = _list_value(result, "skills", data.get("skills", []))
+    result = _node_json(
+        "只优化 skills 模块并返回完整 skills 数组。保留全部条目、id、数量和顺序；只自然强化已有证据支持的 JD 关键词，无证据关键词不得新增。",
+        state,
+    )
+    data["skills"] = _merge_section_content(
+        data.get("skills", []),
+        _list_value(result, "skills", data.get("skills", [])),
+    )
     return {"optimized_resume_data": data}
 
 
 def optimize_projects_node(state: JdOptimizeState) -> JdOptimizeState:
     data = deepcopy(state["optimized_resume_data"])
-    result = _node_json("只优化 projects 模块，突出匹配岗位的技术点、业务价值和成果，返回 projects 数组。", state)
-    data["projects"] = _list_value(result, "projects", data.get("projects", []))
+    result = _node_json(
+        "只优化 projects 模块并返回完整 projects 数组。保留全部条目、id、数量和顺序；基于原文澄清场景、本人动作、技术选择和已有结果，不得新增技术或数字。",
+        state,
+    )
+    data["projects"] = _merge_section_content(
+        data.get("projects", []),
+        _list_value(result, "projects", data.get("projects", [])),
+    )
     return {"optimized_resume_data": data}
 
 
 def optimize_work_node(state: JdOptimizeState) -> JdOptimizeState:
     data = deepcopy(state["optimized_resume_data"])
-    result = _node_json("只优化 work 模块，强调职责、贡献和结果，返回 work 数组。", state)
-    data["work"] = _list_value(result, "work", data.get("work", []))
+    result = _node_json(
+        "只优化 work 模块并返回完整 work 数组。保留全部条目、id、数量和顺序；基于原文强化职责边界、本人贡献和已有结果，不得新增职责或数字。",
+        state,
+    )
+    data["work"] = _merge_section_content(
+        data.get("work", []),
+        _list_value(result, "work", data.get("work", [])),
+    )
     return {"optimized_resume_data": data}
 
 
 def optimize_summary_node(state: JdOptimizeState) -> JdOptimizeState:
     data = deepcopy(state["optimized_resume_data"])
-    result = _node_json("根据 JD 重写个人简介，返回 summary 对象。", state)
-    data["summary"] = _dict_value(result, "summary", data.get("summary", {}))
+    result = _node_json(
+        "只基于简历已有事实和 JD 相关性优化个人简介，返回 summary 对象。控制在 2-4 句，不得把 JD 缺失项写成候选人能力。",
+        state,
+    )
+    data["summary"] = _merge_section_content(
+        data.get("summary", {}),
+        _dict_value(result, "summary", data.get("summary", {})),
+    )
     return {"optimized_resume_data": data}
 
 
 def score_resume_node(state: JdOptimizeState) -> JdOptimizeState:
-    result = _node_json("给优化后的简历评分，返回 score 和 suggestions。", state)
+    result = _node_json(
+        "根据优化后简历对 JD 的可核验证据匹配度评分，返回 0-100 整数 score 和 suggestions。建议只描述真实修改或以‘待核实：’标记无证据缺口。",
+        state,
+    )
     return {"score": _safe_int(result.get("score", 0), 0), "suggestions": _string_list(result.get("suggestions", []))}
 
 

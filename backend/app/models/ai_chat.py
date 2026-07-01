@@ -29,6 +29,7 @@ class AiChatMessage(Base):
     resume_id: Mapped[int] = mapped_column(BigInteger, index=True)
     role: Mapped[str] = mapped_column(String(20))
     content: Mapped[str] = mapped_column(Text)
+    attachments: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSON, nullable=True)
     suggestions: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
     optimized_resume_data: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)
     action_status: Mapped[str] = mapped_column(String(20), default="none")
