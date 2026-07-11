@@ -639,6 +639,7 @@ def agent_chat(
 # ============ 知识库 + 规则引擎（不调 AI） ============
 
 class RuleGenerateWorkRequest(BaseModel):
+    resume_id: int | None = None
     company: str
     position: str
     description: str = ""
@@ -646,6 +647,7 @@ class RuleGenerateWorkRequest(BaseModel):
 
 
 class RuleGenerateProjectRequest(BaseModel):
+    resume_id: int | None = None
     name: str
     description: str = ""
     tech_stack: str = ""
@@ -662,10 +664,12 @@ class RuleEnrichRequest(BaseModel):
 @router.post("/rule/work")
 def rule_generate_work(
     payload: RuleGenerateWorkRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """用规则引擎生成工作经历（不调 AI）。"""
+    """用规则引擎生成工作经历并写入简历（不调 AI）。"""
     from app.services.agent.rule_engine import generate_work_experience
+    from sqlalchemy.orm.attributes import flag_modified
 
     result = generate_work_experience(
         company=payload.company,
@@ -673,22 +677,61 @@ def rule_generate_work(
         description=payload.description,
         period=payload.period,
     )
+
+    # 写入简历
+    if payload.resume_id:
+        resume = get_resume(db, current_user.id, payload.resume_id)
+        data = resume.resume_data or {}
+        work_list = data.get("work", [])
+        work_list.append({
+            "company": result["company"],
+            "position": result["position"],
+            "period": result["period"],
+            "description": result["description"],
+        })
+        data["work"] = work_list
+        resume.resume_data = data
+        flag_modified(resume, "resume_data")
+        db.commit()
+        result["saved"] = True
+        result["work_count"] = len(work_list)
+
     return success(result)
 
 
 @router.post("/rule/project")
 def rule_generate_project(
     payload: RuleGenerateProjectRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """用规则引擎生成项目经历（不调 AI）。"""
+    """用规则引擎生成项目经历并写入简历（不调 AI）。"""
     from app.services.agent.rule_engine import generate_project_experience
+    from sqlalchemy.orm.attributes import flag_modified
 
     result = generate_project_experience(
         name=payload.name,
         description=payload.description,
         tech_stack=payload.tech_stack,
     )
+
+    # 写入简历
+    if payload.resume_id:
+        resume = get_resume(db, current_user.id, payload.resume_id)
+        data = resume.resume_data or {}
+        projects_list = data.get("projects", [])
+        projects_list.append({
+            "name": result["name"],
+            "description": result["description"],
+            "tech_stack": result.get("tech_stack", []),
+        })
+        data["projects"] = projects_list
+        resume.resume_data = data
+        flag_modified(resume, "resume_data")
+        db.commit()
+        result["saved"] = True
+        result["project_count"] = len(projects_list)
+
     return success(result)
 
 
