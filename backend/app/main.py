@@ -15,7 +15,7 @@ from app.core.response import success
 configure_logging()
 
 logger = logging.getLogger(__name__)
-access_logger = logging.getLogger("vitaflow.access")
+access_logger = logging.getLogger("flowcv.access")
 
 
 @asynccontextmanager

@@ -7,7 +7,7 @@ const request = axios.create({
 })
 
 request.interceptors.request.use((config) => {
-  const token = localStorage.getItem("vitaflow_token")
+  const token = localStorage.getItem("flowcv_token")
   if (token) config.headers.Authorization = `Bearer ${token}`
   return config
 })
@@ -23,7 +23,7 @@ request.interceptors.response.use(
   },
   async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("vitaflow_token")
+      localStorage.removeItem("flowcv_token")
       window.location.href = "/login"
     }
     let message = error.response?.data?.message || error.message || "请求失败"

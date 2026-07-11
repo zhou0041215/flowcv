@@ -177,7 +177,7 @@ def export_word(db: Session, user_id: int, resume: Resume) -> Path:
                     if item.get(field):
                         doc.add_paragraph(_plain(item.get(field), colon))
 
-    file_name = f"vitaflow_resume_{resume.id}.docx"
+    file_name = f"flowcv_resume_{resume.id}.docx"
     file_path = settings.export_path / file_name
     doc.save(file_path)
     db.add(ExportRecord(user_id=user_id, resume_id=resume.id, file_type="word", file_name=file_name, file_path=str(file_path)))

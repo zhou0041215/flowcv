@@ -7,9 +7,9 @@ import { ArrowRight, Play, Sparkles } from "lucide-vue-next"
     <div class="hero-stage">
       <div class="hero-noise"></div>
       <div class="hero-copy">
-        <p class="hero-eyebrow"><Sparkles :size="13" /> AI RESUME WORKSPACE</p>
+        <p class="hero-eyebrow"><Sparkles :size="13" /> FLOWCV · AI RESUME</p>
         <h1 id="home-hero-title">让你的经历，<br><em>更快被看见。</em></h1>
-        <p class="hero-lead">从内容梳理、岗位匹配到专业排版，VitaFlow 把每次修改都变成更接近目标岗位的一步。</p>
+        <p class="hero-lead">从内容梳理、岗位匹配到专业排版，FlowCV 把每次修改都变成更接近目标岗位的一步。</p>
         <div class="hero-actions">
           <RouterLink to="/resumes" class="hero-button hero-button-dark">开始创建 <ArrowRight :size="17" /></RouterLink>
           <RouterLink to="/templates" class="hero-button hero-button-light"><Play :size="15" fill="currentColor" /> 浏览模板</RouterLink>

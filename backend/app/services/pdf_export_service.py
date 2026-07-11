@@ -240,7 +240,7 @@ PAGED_EXPORT_SCRIPT = r"""
       padding: 0 !important;
       background: white !important;
     }
-    .vitaflow-export-page {
+    .flowcv-export-page {
       position: relative;
       width: 210mm;
       height: 297mm;
@@ -249,17 +249,17 @@ PAGED_EXPORT_SCRIPT = r"""
       page-break-after: always;
       break-after: page;
     }
-    .vitaflow-export-page:last-child {
+    .flowcv-export-page:last-child {
       page-break-after: auto;
       break-after: auto;
     }
-    .vitaflow-export-window {
+    .flowcv-export-window {
       position: absolute;
       left: 0;
       width: 210mm;
       overflow: hidden;
     }
-    .vitaflow-export-window > .resume-page {
+    .flowcv-export-window > .resume-page {
       width: 210mm !important;
       min-height: 297mm !important;
       margin: 0 !important;
@@ -272,9 +272,9 @@ PAGED_EXPORT_SCRIPT = r"""
 
   slices.forEach((slice) => {
     const shell = document.createElement('section');
-    shell.className = 'vitaflow-export-page';
+    shell.className = 'flowcv-export-page';
     const viewport = document.createElement('div');
-    viewport.className = 'vitaflow-export-window';
+    viewport.className = 'flowcv-export-window';
     viewport.style.top = `${slice.viewportTop}px`;
     viewport.style.height = `${slice.viewportHeight}px`;
     viewport.innerHTML = pageHtml;

@@ -168,7 +168,7 @@
 
   .home-footer { display: grid; width: min(calc(100% - 64px),1320px); grid-template-columns: 1fr auto; align-items: center; gap: 30px; margin: 0 auto; padding: 70px 0 48px; }
   .footer-brand { display: flex; align-items: center; gap: 14px; }
-  .footer-mark { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 13px; background: var(--ink); font-family: monospace; font-size: 12px; color: #fff; }
+  .footer-mark { display: grid; width: 45px; height: 45px; place-items: center; border-radius: 13px; background: var(--ink); font-family: monospace; font-size: 11px; color: #fff; }
   .footer-brand strong,.footer-brand small { display: block; }
   .footer-brand strong { font-size: 18px; }
   .footer-brand small { margin-top: 6px; font-size: 11px; color: #89929c; }

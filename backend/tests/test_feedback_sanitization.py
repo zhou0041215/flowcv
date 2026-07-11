@@ -9,7 +9,7 @@ class FeedbackSanitizationTest(unittest.TestCase):
     def test_sanitizer_removes_executable_html_and_keeps_safe_content(self) -> None:
         content = (
             '<p onclick="alert(1)">正常反馈</p>'
-            '<script>localStorage.getItem("vitaflow_token")</script>'
+            '<script>localStorage.getItem("flowcv_token")</script>'
             '<img src="javascript:alert(2)" onerror="alert(3)" alt="截图">'
             '<img src="/api/files/feedback.png" alt="安全截图">'
         )

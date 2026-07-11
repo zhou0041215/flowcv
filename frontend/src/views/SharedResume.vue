@@ -159,8 +159,8 @@ onBeforeUnmount(() => {
     <footer v-if="sharedResume && !loading && !error" class="border-t border-zinc-200/80 bg-white py-6 sm:py-8">
       <div class="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
         <div class="flex flex-col items-center sm:items-start text-center sm:text-left">
-          <span class="text-sm font-bold tracking-tight text-zinc-900">VitaFlow 简历流</span>
-          <p class="mt-1 text-xs text-zinc-500">还在为找工作发愁？使用 VitaFlow 轻松提炼出彩简历。</p>
+          <span class="text-sm font-bold tracking-tight text-zinc-900">FlowCV FlowCV</span>
+          <p class="mt-1 text-xs text-zinc-500">还在为找工作发愁？使用 FlowCV 轻松提炼出彩简历。</p>
         </div>
         <a href="/" target="_blank" class="inline-flex h-10 items-center justify-center rounded-lg bg-zinc-900 px-5 text-xs font-medium !text-white shadow-sm transition-all hover:bg-zinc-800 active:scale-95">
           免费制作同款简历 &rarr;

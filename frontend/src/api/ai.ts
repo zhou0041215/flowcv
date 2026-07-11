@@ -90,7 +90,7 @@ import { showGlobalToast } from "@/utils/toast"
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 
 async function postAiStream<T = any>(path: string, data: any, callbacks: StreamCallbacks<T> = {}) {
-  const token = localStorage.getItem("vitaflow_token")
+  const token = localStorage.getItem("flowcv_token")
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: {
@@ -101,7 +101,7 @@ async function postAiStream<T = any>(path: string, data: any, callbacks: StreamC
   })
 
   if (response.status === 401) {
-    localStorage.removeItem("vitaflow_token")
+    localStorage.removeItem("flowcv_token")
     window.location.href = "/login"
     throw new Error("登录已过期，请重新登录")
   }

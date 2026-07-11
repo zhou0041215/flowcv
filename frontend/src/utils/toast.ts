@@ -1,10 +1,10 @@
 let globalToastTimer: ReturnType<typeof setTimeout> | undefined
 
 export function showGlobalToast(message: string, type: "success" | "error" = "success") {
-  let div = document.getElementById("vitaflow-global-toast") as HTMLDivElement
+  let div = document.getElementById("flowcv-global-toast") as HTMLDivElement
   if (!div) {
     div = document.createElement("div")
-    div.id = "vitaflow-global-toast"
+    div.id = "flowcv-global-toast"
     div.className = "fixed z-[9999] flex w-max max-w-[90vw] items-center gap-2 rounded-xl bg-zinc-900 px-5 py-3 text-[14px] font-medium text-white shadow-xl border border-zinc-800 transition-all duration-300 opacity-0"
     div.style.left = "50%"
     div.style.bottom = "2.5rem" // bottom-10

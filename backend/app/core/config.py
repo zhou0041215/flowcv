@@ -6,8 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "VitaFlow"
-    app_cn_name: str = "简历流"
+    app_name: str = "FlowCV"
+    app_cn_name: str = "FlowCV"
     app_env: str = "development"
     app_host: str = "0.0.0.0"
     app_port: int = 8000
@@ -27,11 +27,11 @@ class Settings(BaseSettings):
     db_port: int = 3306
     db_user: str = "root"
     db_password: str = "123456"
-    db_name: str = "vitaflow"
+    db_name: str = "flowcv"
     db_charset: str = "utf8mb4"
 
     redis_url: str = "redis://127.0.0.1:6379/0"
-    redis_key_prefix: str = "vitaflow"
+    redis_key_prefix: str = "flowcv"
     redis_socket_timeout: int = Field(default=3, gt=0)
     announcement_cache_ttl_seconds: int = Field(default=600, gt=0)
 
@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: str = ""
     smtp_from_email: str = ""
-    smtp_from_name: str = "VitaFlow"
+    smtp_from_name: str = "FlowCV"
     smtp_use_ssl: bool = True
     smtp_use_tls: bool = False
     smtp_timeout: int = 10
@@ -70,9 +70,9 @@ class Settings(BaseSettings):
     minio_endpoint: str = "127.0.0.1:9000"
     minio_access_key: str = "minioadmin"
     minio_secret_key: str = "minioadmin"
-    minio_bucket: str = "vitaflow"
+    minio_bucket: str = "flowcv"
     minio_secure: bool = False
-    minio_public_url: str = "http://127.0.0.1:9000/vitaflow"
+    minio_public_url: str = "http://127.0.0.1:9000/flowcv"
 
     aliyun_oss_endpoint: str = ""
     aliyun_oss_access_key_id: str = ""

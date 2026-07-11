@@ -66,7 +66,7 @@ def configure_logging() -> None:
                 "handlers": root_handlers,
             },
             "loggers": {
-                "vitaflow": {
+                "flowcv": {
                     "level": log_level,
                     "handlers": root_handlers,
                     "propagate": False,

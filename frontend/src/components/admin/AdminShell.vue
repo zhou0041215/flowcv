@@ -54,9 +54,9 @@ defineEmits<{
 
         <header class="mb-7 flex items-end justify-between gap-4">
           <div>
-            <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 sm:mb-2 sm:text-xs sm:tracking-[0.18em]">VitaFlow Admin</p>
+            <p class="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.15em] text-zinc-400 sm:mb-2 sm:text-xs sm:tracking-[0.18em]">FlowCV Admin</p>
             <h1 class="text-2xl font-semibold tracking-tight text-zinc-950 sm:text-3xl">{{ title }}</h1>
-            <p class="mt-1.5 text-xs text-zinc-500 sm:mt-2 sm:text-sm">管理与配置 VitaFlow 系统各项核心功能</p>
+            <p class="mt-1.5 text-xs text-zinc-500 sm:mt-2 sm:text-sm">管理与配置 FlowCV 系统各项核心功能</p>
           </div>
           <Button variant="outline" size="sm" :disabled="loading" @click="$emit('refresh')"><RefreshCw class="h-4 w-4" :class="{ 'animate-spin': loading }" />刷新</Button>
         </header>

@@ -81,7 +81,7 @@ export function createResumePaginationScript() {
           });
         }
 
-        window.__vitaflowSettleResumePages = settlePageBreaks;
+        window.__flowcvSettleResumePages = settlePageBreaks;
         requestAnimationFrame(function () {
           settlePageBreaks();
           requestAnimationFrame(settlePageBreaks);

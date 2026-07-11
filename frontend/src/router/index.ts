@@ -28,7 +28,7 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const publicPages = ["/", "/login", "/register", "/templates"]
-  const token = localStorage.getItem("vitaflow_token")
+  const token = localStorage.getItem("flowcv_token")
   const isPublicShare = to.path.startsWith("/share/")
   if (!publicPages.includes(to.path) && !isPublicShare && !token) return "/login"
   if (to.meta.requiresAdmin) {

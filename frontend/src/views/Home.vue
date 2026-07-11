@@ -16,8 +16,8 @@ import WorkflowSection from "@/components/home/WorkflowSection.vue"
 
       <footer class="home-footer">
         <div class="footer-brand">
-          <span class="footer-mark">VF</span>
-          <div><strong>VitaFlow</strong><small>让经历流向更好的机会</small></div>
+          <span class="footer-mark">FC</span>
+          <div><strong>FlowCV</strong><small>让经历流向更好的机会</small></div>
         </div>
         <div class="footer-links">
           <RouterLink to="/templates">模板中心</RouterLink>

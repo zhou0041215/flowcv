@@ -4,7 +4,7 @@ import type { UserInfo } from "@/types/user"
 
 export const useUserStore = defineStore("user", {
   state: () => ({
-    token: localStorage.getItem("vitaflow_token") || "",
+    token: localStorage.getItem("flowcv_token") || "",
     userInfo: null as UserInfo | null,
   }),
   actions: {
@@ -12,12 +12,12 @@ export const useUserStore = defineStore("user", {
       const data = await loginApi({ email, password })
       this.token = data.access_token
       this.userInfo = data.user
-      localStorage.setItem("vitaflow_token", data.access_token)
+      localStorage.setItem("flowcv_token", data.access_token)
     },
     logout() {
       this.token = ""
       this.userInfo = null
-      localStorage.removeItem("vitaflow_token")
+      localStorage.removeItem("flowcv_token")
     },
     async getUserInfo() {
       this.userInfo = await meApi()

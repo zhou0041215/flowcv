@@ -192,7 +192,7 @@ async function handleResetPassword() {
   <div id="vita-auth-page" class="auth-page">
     <div class="auth-grid" aria-hidden="true"></div>
     <header class="auth-topbar">
-      <RouterLink to="/" class="brand-link" aria-label="返回 VitaFlow 首页">
+      <RouterLink to="/" class="brand-link" aria-label="返回 FlowCV 首页">
         <BrandLogo size="sm" />
       </RouterLink>
       <div class="workspace-status"><span class="status-light"></span>AI RESUME WORKSPACE</div>
@@ -203,7 +203,7 @@ async function handleResetPassword() {
         <div class="story-copy">
           <p class="story-eyebrow"><span>表达，不止是排版</span></p>
           <h1 id="auth-story-title" class="story-title">让每一段经历，<span>都落在关键位置。</span></h1>
-          <p class="story-description">VitaFlow 把内容梳理、岗位匹配和专业排版放进同一张工作台，让你的简历更准确，也更有分量。</p>
+          <p class="story-description">FlowCV 把内容梳理、岗位匹配和专业排版放进同一张工作台，让你的简历更准确，也更有分量。</p>
         </div>
 
         <div class="resume-lab" aria-label="AI 正在校订一份简历的动态示意">
@@ -245,7 +245,7 @@ async function handleResetPassword() {
 
       <section class="auth-zone" aria-label="账号登录与注册">
         <div class="mobile-brand">
-          <RouterLink to="/" class="brand-link" aria-label="返回 VitaFlow 首页"><BrandLogo size="sm" /></RouterLink>
+          <RouterLink to="/" class="brand-link" aria-label="返回 FlowCV 首页"><BrandLogo size="sm" /></RouterLink>
         </div>
         <div class="auth-card">
           <div class="auth-flip" :class="{ flipped: isRegister, 'is-reset': isForgotPassword }">
@@ -285,7 +285,7 @@ async function handleResetPassword() {
                   <button type="button" class="secondary-action" @click="backToLogin">返回登录</button>
                 </form>
 
-                <div v-if="!isForgotPassword" class="mode-switch"><span>第一次使用 VitaFlow？</span><button type="button" @click="toggleMode('/register')">创建账号</button></div>
+                <div v-if="!isForgotPassword" class="mode-switch"><span>第一次使用 FlowCV？</span><button type="button" @click="toggleMode('/register')">创建账号</button></div>
               </section>
 
               <section class="panel-face back">
@@ -313,7 +313,7 @@ async function handleResetPassword() {
         </div>
 
         <div class="security-note"><ShieldCheck class="h-4 w-4" /><span>你的简历内容仅用于当前工作台，不会公开展示。</span></div>
-        <div class="mobile-footer"><span>&copy; 2026 VitaFlow</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">鲁ICP备2023002307号-2</a></div>
+        <div class="mobile-footer"><span>&copy; 2026 FlowCV</span></div>
       </section>
     </main>
 

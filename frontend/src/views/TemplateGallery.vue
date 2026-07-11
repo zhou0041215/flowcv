@@ -89,7 +89,7 @@ function changePage(nextPage: number) {
 }
 
 function requireLogin() {
-  const token = localStorage.getItem("vitaflow_token")
+  const token = localStorage.getItem("flowcv_token")
   if (!token) {
     router.push('/login')
     return false

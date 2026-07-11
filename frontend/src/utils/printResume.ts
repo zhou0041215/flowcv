@@ -52,8 +52,8 @@ export async function printResumeHtml(html: string, title = "简历") {
   await new Promise((resolve) => window.setTimeout(resolve, 160))
   await waitForFonts(printWindow.document)
   await waitForImages(printWindow.document)
-  const printableWindow = printWindow as Window & { __vitaflowSettleResumePages?: () => void }
-  printableWindow.__vitaflowSettleResumePages?.()
+  const printableWindow = printWindow as Window & { __flowcvSettleResumePages?: () => void }
+  printableWindow.__flowcvSettleResumePages?.()
   await new Promise((resolve) => window.setTimeout(resolve, 80))
   printWindow.focus()
   printWindow.print()

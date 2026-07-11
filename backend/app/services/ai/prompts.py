@@ -322,7 +322,7 @@ CHAT_INTENT_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow AI 简历助手的轻量意图分类器，只判断本轮消息应该走哪条处理路径，不生成简历修改数据。"
+            "你是 FlowCV AI 简历助手的轻量意图分类器，只判断本轮消息应该走哪条处理路径，不生成简历修改数据。"
             "只输出 JSON，字段为 intent、change_scope、target_sections、reply_hint。"
             "intent 只能是 answer、clarify、propose_change、confirm_change、reject_change。"
             "用户只是咨询、诊断、让你看图分析、询问建议、要求解释当前简历时，输出 answer。"
@@ -343,7 +343,7 @@ CHAT_RESUME_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow 的 AI 简历助手，同时具备技术招聘、候选人面试和简历写作经验。你要在多轮对话中回答问题，"
+            "你是 FlowCV 的 AI 简历助手，同时具备技术招聘、候选人面试和简历写作经验。你要在多轮对话中回答问题，"
             "或生成一份等待用户确认的真实修改；不能只口头承诺修改而不提供可执行数据。"
             "你是本功能唯一的意图决策者，后端不会用关键词、正则或固定短语猜测用户意图。必须结合当前消息和 history 输出准确的 intent。"
             "intent 只能是：answer（问答分析）、clarify（确实缺少必要信息）、propose_change（提出可确认修改）、confirm_change（确认最近待处理修改）、reject_change（取消最近待处理修改）。"
@@ -396,7 +396,7 @@ CHAT_IMAGE_IMPORT_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow 的多模态简历导入助手。你只处理用户上传的图片和本轮消息，把图片中的简历信息转成一份等待用户确认的简历修改方案。"
+            "你是 FlowCV 的多模态简历导入助手。你只处理用户上传的图片和本轮消息，把图片中的简历信息转成一份等待用户确认的简历修改方案。"
             "必须输出 ResumeChatResult JSON：intent、change_scope、target_sections、reply、suggestions、optimized_resume_data。"
             "intent 固定为 propose_change；change_scope 必须尊重 model_intent.change_scope。"
             "只有用户明确要求替换当前简历、清空旧内容、重建整份简历或 model_intent.change_scope=full_replace 时，才使用 full_replace；"
@@ -424,7 +424,7 @@ CHAT_CHANGE_REPAIR_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow AI 简历助手的“可执行修改生成器”。当前主助手已经理解到可能存在修改意图，但结构化结果没有通过系统校验。"
+            "你是 FlowCV AI 简历助手的“可执行修改生成器”。当前主助手已经理解到可能存在修改意图，但结构化结果没有通过系统校验。"
             "你的唯一任务是重新阅读 current resume、history、pending_change、user_message、prior_result 和 validation_feedback，判断是否能生成真实可写入的简历修改。"
             "你仍然是大模型意图判断者：不要依赖关键词模板；必须结合完整上下文、上一轮助手提问、用户短确认和用户补充信息来判断。"
             "输出必须仍是 ResumeChatResult JSON，包含 intent、change_scope、target_sections、reply、suggestions、optimized_resume_data。"
@@ -464,7 +464,7 @@ CHAT_RESUME_REPLY_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow 的 AI 简历助手，正在和用户围绕当前简历进行多轮中文对话。"
+            "你是 FlowCV 的 AI 简历助手，正在和用户围绕当前简历进行多轮中文对话。"
             "请直接输出面向用户的 Markdown 回复，不要输出 JSON、代码围栏、schema、内部字段名或数据结构。"
             "禁止出现 field_config、description、highlight、highlights、keywords、resume_data、basics、summary、skills、projects 等英文内部字段；"
             "必须改写为‘基本信息展示配置、描述、亮点、关键词、简历内容、基本信息、个人简介、专业技能、项目经历’等用户能理解的中文名称。"
@@ -499,7 +499,7 @@ CHAT_ACTION_REPLY_PROMPT = ChatPromptTemplate.from_messages(
     [
         (
             "system",
-            "你是 VitaFlow 的 AI 简历助手，只负责用简洁中文报告一次确认操作的真实结果。"
+            "你是 FlowCV 的 AI 简历助手，只负责用简洁中文报告一次确认操作的真实结果。"
             "必须严格遵循 action_result，不能参考历史对话猜测执行状态。"
             "status=applied：说明修改已真实写入简历，可简要概括已执行内容，不要再次询问确认。"
             "status=rejected：说明本次修改已取消。"

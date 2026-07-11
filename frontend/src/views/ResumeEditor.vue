@@ -279,7 +279,7 @@ const aiCapability = ref<AiCapability | null>(null)
 const flowPointSummary = ref<FlowPointSummary | null>(null)
 const aiCapabilityLoaded = ref(false)
 const chatDecisionLoadingId = ref<number | string | null>(null)
-const selectedChatModelId = ref<number | null>(Number(localStorage.getItem("vitaflow_chat_model_id") || 0) || null)
+const selectedChatModelId = ref<number | null>(Number(localStorage.getItem("flowcv_chat_model_id") || 0) || null)
 const chatModels = computed<AiChatModelOption[]>(() => aiCapability.value?.chat_models || [])
 const selectedChatModel = computed(() => chatModels.value.find((item) => item.id === selectedChatModelId.value) || chatModels.value[0] || null)
 const effectiveChatModelId = computed(() => selectedChatModel.value?.id ?? selectedChatModelId.value ?? null)
@@ -314,8 +314,8 @@ watch(sidePanel, (newVal) => {
 })
 
 watch(selectedChatModelId, (value) => {
-  if (value) localStorage.setItem("vitaflow_chat_model_id", String(value))
-  else localStorage.removeItem("vitaflow_chat_model_id")
+  if (value) localStorage.setItem("flowcv_chat_model_id", String(value))
+  else localStorage.removeItem("flowcv_chat_model_id")
 })
 
 const isResizing = ref(false)

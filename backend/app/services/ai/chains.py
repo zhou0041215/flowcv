@@ -60,7 +60,7 @@ from app.services.resume_locale import (
 from app.services.storage.storage_service import read_uploaded_file
 
 T = TypeVar("T", bound=BaseModel)
-MODEL_IO_LOGGER_NAME = "vitaflow.ai.model_io"
+MODEL_IO_LOGGER_NAME = "flowcv.ai.model_io"
 MODEL_IO_REDACTED_KEYS = {
     "api_key",
     "authorization",

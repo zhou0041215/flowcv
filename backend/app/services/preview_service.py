@@ -36,7 +36,7 @@ env.filters["inline_text"] = inline_text
 
 FONT_PRESETS: dict[str, list[str]] = {
     "vf-sans": [
-        "VitaFlow Sans SC",
+        "FlowCV Sans SC",
         "Noto Sans SC",
         "Noto Sans CJK SC",
         "Source Han Sans SC",
@@ -47,7 +47,7 @@ FONT_PRESETS: dict[str, list[str]] = {
         "sans-serif",
     ],
     "vf-serif": [
-        "VitaFlow Serif SC",
+        "FlowCV Serif SC",
         "Noto Serif SC",
         "Noto Serif CJK SC",
         "Source Han Serif SC",
@@ -57,7 +57,7 @@ FONT_PRESETS: dict[str, list[str]] = {
         "serif",
     ],
     "vf-rounded": [
-        "VitaFlow Rounded SC",
+        "FlowCV Rounded SC",
         "Yuanti SC",
         "圆体-简",
         "STYuanti-SC-Regular",
@@ -69,24 +69,24 @@ FONT_PRESETS: dict[str, list[str]] = {
         "Arial",
         "sans-serif",
     ],
-    "vf-kai": ["VitaFlow Kai SC", "LXGW WenKai", "AR PL UKai CN", "KaiTi", "STKaiti", "serif"],
+    "vf-kai": ["FlowCV Kai SC", "LXGW WenKai", "AR PL UKai CN", "KaiTi", "STKaiti", "serif"],
 }
 FONT_FACE_FILES: dict[str, list[tuple[str, int, str]]] = {
     "vf-sans": [
-        ("VitaFlow Sans SC", 400, "NotoSansSC-Regular.woff2"),
-        ("VitaFlow Sans SC", 700, "NotoSansSC-Bold.woff2"),
+        ("FlowCV Sans SC", 400, "NotoSansSC-Regular.woff2"),
+        ("FlowCV Sans SC", 700, "NotoSansSC-Bold.woff2"),
     ],
     "vf-serif": [
-        ("VitaFlow Serif SC", 400, "NotoSerifSC-Regular.woff2"),
-        ("VitaFlow Serif SC", 700, "NotoSerifSC-Bold.woff2"),
+        ("FlowCV Serif SC", 400, "NotoSerifSC-Regular.woff2"),
+        ("FlowCV Serif SC", 700, "NotoSerifSC-Bold.woff2"),
     ],
     "vf-rounded": [
-        ("VitaFlow Rounded SC", 400, "HarmonyOSSansSC-Regular.woff2"),
-        ("VitaFlow Rounded SC", 700, "HarmonyOSSansSC-Bold.woff2"),
+        ("FlowCV Rounded SC", 400, "HarmonyOSSansSC-Regular.woff2"),
+        ("FlowCV Rounded SC", 700, "HarmonyOSSansSC-Bold.woff2"),
     ],
     "vf-kai": [
-        ("VitaFlow Kai SC", 400, "LXGWWenKai-Regular.woff2"),
-        ("VitaFlow Kai SC", 700, "LXGWWenKai-Bold.woff2"),
+        ("FlowCV Kai SC", 400, "LXGWWenKai-Regular.woff2"),
+        ("FlowCV Kai SC", 700, "LXGWWenKai-Bold.woff2"),
     ],
 }
 
