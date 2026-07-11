@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from difflib import SequenceMatcher
 from typing import Any
 
 from app.services.agent.knowledge_base import (
@@ -16,44 +17,107 @@ from app.services.agent.knowledge_base import (
 )
 
 
+def _fuzzy_match(text: str, candidates: list[str], threshold: float = 0.6) -> str | None:
+    """模糊匹配，返回最相似的候选值。"""
+    text_lower = text.lower().strip()
+    best_match = None
+    best_score = 0
+
+    for candidate in candidates:
+        candidate_lower = candidate.lower()
+
+        # 完全包含
+        if candidate_lower in text_lower or text_lower in candidate_lower:
+            return candidate
+
+        # SequenceMatcher 模糊匹配
+        score = SequenceMatcher(None, text_lower, candidate_lower).ratio()
+        if score > best_score:
+            best_score = score
+            best_match = candidate
+
+    return best_match if best_score >= threshold else None
+
+
 def match_company(text: str) -> dict[str, Any] | None:
-    """从文本中匹配公司信息。"""
+    """从文本中模糊匹配公司信息。"""
+    # 先尝试精确匹配
     for name, info in COMPANY_DB.items():
         if name in text:
             return {"name": name, **info}
+
+    # 模糊匹配
+    matched = _fuzzy_match(text, list(COMPANY_DB.keys()), threshold=0.5)
+    if matched:
+        return {"name": matched, **COMPANY_DB[matched]}
     return None
 
 
 def match_position(text: str) -> dict[str, Any] | None:
-    """从文本中匹配职位信息。"""
+    """从文本中模糊匹配职位信息。"""
+    # 先尝试精确匹配
     for title, info in POSITION_DB.items():
         if title in text or any(kw in text for kw in info.get("keywords", [])):
             return {"title": title, **info}
+
+    # 模糊匹配职位名称
+    matched = _fuzzy_match(text, list(POSITION_DB.keys()), threshold=0.5)
+    if matched:
+        return {"title": matched, **POSITION_DB[matched]}
     return None
 
 
 def extract_skills(text: str) -> list[str]:
-    """从文本中提取技能关键词。"""
+    """从文本中模糊提取技能关键词。"""
     found = []
+    text_lower = text.lower()
+
     for skill, info in SKILL_DB.items():
-        if skill.lower() in text.lower():
+        skill_lower = skill.lower()
+
+        # 精确匹配
+        if skill_lower in text_lower:
             found.append(skill)
+            continue
+
+        # 模糊匹配（针对缩写和变体）
+        score = SequenceMatcher(None, skill_lower, text_lower).ratio()
+        if score > 0.7:
+            found.append(skill)
+
+    # 额外：匹配常见变体
+    skill_aliases = {
+        "vue": "Vue", "react": "React", "node": "Node.js",
+        "java": "Java", "python": "Python", "golang": "Go",
+        "mysql": "MySQL", "redis": "Redis", "docker": "Docker",
+        "k8s": "Kubernetes", "spring": "Spring Boot",
+    }
+    for alias, skill in skill_aliases.items():
+        if alias in text_lower and skill not in found:
+            found.append(skill)
+
     return found
 
 
 def match_project_type(text: str) -> str | None:
-    """从文本中匹配项目类型。"""
+    """从文本中模糊匹配项目类型。"""
     keywords_map = {
-        "支付系统": ["支付", "交易", "订单", "结算", "收款"],
-        "用户系统": ["用户", "注册", "登录", "画像", "推荐"],
-        "电商系统": ["电商", "商品", "购物车", "库存", "促销"],
-        "数据平台": ["数据", "报表", "分析", "指标", "看板"],
-        "管理系统": ["后台", "管理", "权限", "配置", "审核"],
+        "支付系统": ["支付", "交易", "订单", "结算", "收款", "付款", "转账"],
+        "用户系统": ["用户", "注册", "登录", "画像", "推荐", "认证", "权限"],
+        "电商系统": ["电商", "商品", "购物车", "库存", "促销", "商城", "零售"],
+        "数据平台": ["数据", "报表", "分析", "指标", "看板", "统计", "BI"],
+        "管理系统": ["后台", "管理", "权限", "配置", "审核", "CMS", "ERP"],
     }
+
+    # 精确匹配
     for project_type, keywords in keywords_map.items():
         if any(kw in text for kw in keywords):
             return project_type
-    return None
+
+    # 模糊匹配
+    all_types = list(keywords_map.keys())
+    matched = _fuzzy_match(text, all_types, threshold=0.4)
+    return matched
 
 
 def generate_work_experience(

@@ -799,3 +799,79 @@ def rule_list_positions(current_user: User = Depends(get_current_user)):
         for title, info in POSITION_DB.items()
     ]
     return success(positions)
+
+
+# ============ 知识库管理 ============
+
+class KnowledgeItemRequest(BaseModel):
+    category: str
+    key: str
+    value: Any
+
+
+class KnowledgeSearchRequest(BaseModel):
+    category: str
+    query: str
+
+
+@router.get("/knowledge/categories")
+def list_knowledge_categories(current_user: User = Depends(get_current_user)):
+    """列出所有知识库分类。"""
+    from app.services.agent.knowledge_store import list_categories
+
+    return success({"categories": list_categories()})
+
+
+@router.get("/knowledge/{category}")
+def get_knowledge_category(category: str, current_user: User = Depends(get_current_user)):
+    """获取某个分类的知识库数据。"""
+    from app.services.agent.knowledge_store import get_knowledge
+
+    data = get_knowledge(category)
+    return success({"category": category, "count": len(data), "items": data})
+
+
+@router.post("/knowledge/item")
+def add_knowledge_item(
+    payload: KnowledgeItemRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """添加一条知识。"""
+    from app.services.agent.knowledge_store import add_item
+
+    success_result = add_item(payload.category, payload.key, payload.value)
+    return success({"added": success_result, "category": payload.category, "key": payload.key})
+
+
+@router.delete("/knowledge/{category}/{key}")
+def remove_knowledge_item(
+    category: str,
+    key: str,
+    current_user: User = Depends(get_current_user),
+):
+    """删除一条知识。"""
+    from app.services.agent.knowledge_store import remove_item
+
+    success_result = remove_item(category, key)
+    return success({"removed": success_result, "category": category, "key": key})
+
+
+@router.post("/knowledge/search")
+def search_knowledge(
+    payload: KnowledgeSearchRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """模糊搜索知识库。"""
+    from app.services.agent.knowledge_store import search_knowledge
+
+    results = search_knowledge(payload.category, payload.query)
+    return success({"category": payload.category, "query": payload.query, "results": results})
+
+
+@router.post("/knowledge/init")
+def init_knowledge(current_user: User = Depends(get_current_user)):
+    """初始化默认知识库。"""
+    from app.services.agent.knowledge_store import init_default_knowledge
+
+    init_default_knowledge()
+    return success({"message": "知识库已初始化"})

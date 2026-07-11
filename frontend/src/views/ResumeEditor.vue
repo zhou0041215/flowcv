@@ -911,9 +911,11 @@ async function sendChatMessage(content: string, attachments: AiChatAttachment[] 
     // 解析用户意图
     const result = await processWithRuleEngine(content)
 
+    // 流式输出效果（打字机）
+    await streamText(assistantIndex, result.reply)
+
     const assistant = chatMessages.value[assistantIndex]
     if (assistant) {
-      assistant.content = result.reply
       assistant.streaming = false
       assistant.suggestions = result.suggestions || []
     }
@@ -935,6 +937,28 @@ async function sendChatMessage(content: string, attachments: AiChatAttachment[] 
     chatError.value = error.message || "处理失败"
   } finally {
     chatLoading.value = false
+  }
+}
+
+// 流式输出（打字机效果）
+async function streamText(assistantIndex: number, fullText: string) {
+  const assistant = chatMessages.value[assistantIndex]
+  if (!assistant) return
+
+  assistant.content = ""
+  const chars = fullText.split("")
+  let i = 0
+
+  while (i < chars.length) {
+    // 每次显示 1-3 个字符，模拟真实打字
+    const batch = Math.random() > 0.7 ? 2 : 1
+    const chunk = chars.slice(i, i + batch).join("")
+    assistant.content += chunk
+    i += batch
+
+    // 标点符号后停顿稍长
+    const delay = "，。！？、".includes(chunk) ? 50 : Math.random() * 20 + 10
+    await new Promise((resolve) => setTimeout(resolve, delay))
   }
 }
 
