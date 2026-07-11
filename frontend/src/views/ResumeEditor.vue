@@ -907,11 +907,13 @@ async function sendChatMessage(content: string, attachments: AiChatAttachment[] 
   try {
     if (!editor.saved) await save({ refreshPreview: false })
 
-    // 使用 Agent API
+    // 使用 Agent API（支持图片）
+    const imageUrl = attachments.length > 0 ? attachments[0].url : undefined
     const response = await agentChatApi({
       message: content,
       resume_id: resumeId.value,
       history: chatMessages.value.slice(0, -2).map(m => ({ role: m.role, content: m.content })),
+      image_url: imageUrl,
     })
 
     const assistant = chatMessages.value[assistantIndex]

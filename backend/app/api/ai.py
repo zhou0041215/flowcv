@@ -920,6 +920,7 @@ class AgentChatRequest(BaseModel):
     message: str
     resume_id: int | None = None
     history: list[dict[str, str]] | None = None
+    image_url: str | None = None  # 图片 URL（用于视觉模型）
 
 
 @router.post("/agent/task")
@@ -955,12 +956,31 @@ def agent_chat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Agent 对话（支持多步推理和工具调用）。"""
+    """Agent 对话（支持多步推理、工具调用和视觉识别）。"""
     from app.services.agent.agent_core import run_agent
+    from app.services.agent.vision_agent import extract_resume_from_image, image_to_base64
+    from app.services.storage.storage_service import read_uploaded_file
 
     # 验证简历归属
     if payload.resume_id:
         get_resume(db, current_user.id, payload.resume_id)
+
+    # 如果有图片，先用视觉模型识别
+    image_analysis = None
+    if payload.image_url:
+        try:
+            # 从 URL 提取 object_name
+            object_name = payload.image_url.split("/api/files/")[-1] if "/api/files/" in payload.image_url else None
+            if object_name:
+                image_bytes, content_type = read_uploaded_file(object_name)
+                image_base64 = image_to_base64(image_bytes)
+                image_analysis = extract_resume_from_image(image_base64, content_type)
+
+                # 如果识别成功，将内容添加到用户消息
+                if image_analysis.get("success") and image_analysis.get("sections"):
+                    payload.message = f"{payload.message}\n\n[图片识别结果]\n{json.dumps(image_analysis['sections'], ensure_ascii=False, indent=2)}"
+        except Exception as e:
+            logger.warning("图片识别失败: %s", e)
 
     result = run_agent(
         user_message=payload.message,
@@ -968,12 +988,17 @@ def agent_chat(
         history=payload.history,
     )
 
+    # 添加图片分析结果
+    if image_analysis:
+        result["image_analysis"] = image_analysis
+
     return success({
         "reply": result["reply"],
         "steps": result["steps"],
         "tool_calls": result["tool_calls"],
         "resume_modified": result["resume_modified"],
         "errors": result["errors"],
+        "image_analysis": image_analysis,
     })
 
 

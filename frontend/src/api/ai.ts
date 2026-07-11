@@ -72,8 +72,8 @@ export const decideResumeChatChangeApi = (resumeId: number, messageId: number, a
   request.post(`/ai/resume-chat/${resumeId}/messages/${messageId}/decision`, { action })
 export const getAiCapabilityApi = () => request.get<AiCapability, AiCapability>("/ai/capability")
 
-// Agent API（支持多步推理和工具调用）
-export const agentChatApi = (data: { message: string; resume_id?: number; history?: Array<{ role: string; content: string }> }) =>
+// Agent API（支持多步推理、工具调用和视觉识别）
+export const agentChatApi = (data: { message: string; resume_id?: number; history?: Array<{ role: string; content: string }>; image_url?: string }) =>
   request.post("/ai/agent/chat", data)
 export const agentTaskApi = (data: { task_type: string; resume_id: number; params?: Record<string, any> }) =>
   request.post("/ai/agent/task", data)
