@@ -600,3 +600,37 @@ def resume_chat_clear(resume_id: int, db: Session = Depends(get_db), current_use
     get_resume(db, current_user.id, resume_id)
     clear_chat_messages(db, current_user.id, resume_id)
     return success(True)
+
+
+# ============ Agent-based Chat (最小版) ============
+
+class AgentChatRequest(BaseModel):
+    message: str
+    resume_id: int | None = None
+    history: list[dict[str, str]] | None = None
+
+
+@router.post("/agent-chat")
+def agent_chat(
+    payload: AgentChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """基于 Agent 的对话式简历助手（支持工具调用）。"""
+    from app.services.agent.chat_agent import run_chat_agent
+
+    # 验证简历归属
+    if payload.resume_id:
+        get_resume(db, current_user.id, payload.resume_id)
+
+    result = run_chat_agent(
+        user_message=payload.message,
+        resume_id=payload.resume_id,
+        history=payload.history,
+    )
+
+    return success({
+        "reply": result["reply"],
+        "tool_calls": result["tool_calls"],
+        "resume_modified": result["resume_modified"],
+    })

@@ -25,6 +25,7 @@ class AiModelConfig(Base):
     context_messages: Mapped[int] = mapped_column(Integer, default=12)
     is_chat_selectable: Mapped[bool] = mapped_column(Boolean, default=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=100)
+    role: Mapped[str] = mapped_column(String(20), default="main")  # lightweight / main / verify / vision
     chat_points_per_call: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     chat_points_per_million_input_tokens: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     chat_points_per_million_output_tokens: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
