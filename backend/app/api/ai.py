@@ -875,3 +875,97 @@ def init_knowledge(current_user: User = Depends(get_current_user)):
 
     init_default_knowledge()
     return success({"message": "知识库已初始化"})
+
+
+# ============ 多模型系统 ============
+
+class VerifyResumeRequest(BaseModel):
+    resume_id: int
+
+
+class VerifyChangesRequest(BaseModel):
+    old_resume: dict[str, Any]
+    new_resume: dict[str, Any]
+
+
+class IntentRecognizeRequest(BaseModel):
+    message: str
+
+
+class ContentClassifyRequest(BaseModel):
+    text: str
+
+
+class FieldExtractRequest(BaseModel):
+    text: str
+
+
+@router.get("/models/roles")
+def get_model_roles(current_user: User = Depends(get_current_user)):
+    """获取所有模型角色配置状态。"""
+    from app.services.agent.models import get_all_model_roles
+
+    return success(get_all_model_roles())
+
+
+@router.post("/verify/resume")
+def verify_resume_content(
+    payload: VerifyResumeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """校验简历内容（校验模型）。"""
+    from app.services.agent.verify_agent import verify_resume
+
+    resume = get_resume(db, current_user.id, payload.resume_id)
+    data = resume.resume_data or {}
+    result = verify_resume(data)
+    return success(result)
+
+
+@router.post("/verify/changes")
+def verify_resume_changes(
+    payload: VerifyChangesRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """校验简历修改（校验模型）。"""
+    from app.services.agent.verify_agent import verify_changes
+
+    result = verify_changes(payload.old_resume, payload.new_resume)
+    return success(result)
+
+
+@router.post("/intent/recognize")
+def recognize_intent(
+    payload: IntentRecognizeRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """识别用户意图（轻量模型）。"""
+    from app.services.agent.orchestrator import recognize_intent
+
+    result = recognize_intent(payload.message)
+    return success(result)
+
+
+@router.post("/content/classify")
+def classify_content(
+    payload: ContentClassifyRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """分类内容类型（轻量模型）。"""
+    from app.services.agent.orchestrator import classify_content
+
+    result = classify_content(payload.text)
+    return success(result)
+
+
+@router.post("/content/extract")
+def extract_fields(
+    payload: FieldExtractRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """提取结构化字段（轻量模型）。"""
+    from app.services.agent.orchestrator import extract_fields
+
+    result = extract_fields(payload.text)
+    return success(result)

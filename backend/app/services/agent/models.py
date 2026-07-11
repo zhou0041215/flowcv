@@ -18,6 +18,14 @@ logger = logging.getLogger(__name__)
 
 ModelRole = Literal["lightweight", "main", "verify", "vision"]
 
+# 角色用途说明
+ROLE_DESCRIPTIONS = {
+    "lightweight": "轻量模型 — 意图识别、内容分类、简单字段抽取",
+    "main": "主力模型 — 简历生成、JD 分析、复杂改写",
+    "verify": "校验模型 — 检查虚构内容、数字变化和结构缺失",
+    "vision": "视觉模型 — 识别截图、扫描简历和排版问题",
+}
+
 
 def _config_to_llm(config: AiModelConfig, timeout: int | None = None) -> ChatOpenAI:
     return ChatOpenAI(
@@ -72,5 +80,27 @@ def get_llm_by_role(role: ModelRole = "main", timeout: int | None = None) -> Cha
         # 最终回退到环境变量
         logger.warning("未找到任何模型配置，使用环境变量配置")
         return _fallback_llm(timeout)
+    finally:
+        db.close()
+
+
+def get_all_model_roles() -> dict[str, dict]:
+    """获取所有模型角色配置状态。"""
+    db = SessionLocal()
+    try:
+        result = {}
+        for role, desc in ROLE_DESCRIPTIONS.items():
+            config = db.scalar(
+                select(AiModelConfig)
+                .where(AiModelConfig.role == role, AiModelConfig.is_active == True)  # noqa: E712
+                .limit(1)
+            )
+            result[role] = {
+                "description": desc,
+                "configured": config is not None,
+                "model_name": config.name if config else None,
+                "model": config.model if config else None,
+            }
+        return result
     finally:
         db.close()
