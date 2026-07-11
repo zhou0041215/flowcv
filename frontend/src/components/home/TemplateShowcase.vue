@@ -1,37 +1,135 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue"
+import { nextTick, onMounted, onUnmounted, ref, computed } from "vue"
+import { ArrowRight } from "lucide-vue-next"
 import { listTemplatesApi, type TemplateItem } from "@/api/template"
 import TemplatePreview from "@/components/templates/TemplatePreview.vue"
+import ScrollFloat from "@/components/ui/ScrollFloat.vue"
 
 const templates = ref<TemplateItem[]>([])
+const templateTrackRef = ref<HTMLElement | null>(null)
+const isPaused = ref(false)
+const isDragging = ref(false)
+let dragStartX = 0
+let dragStartScrollLeft = 0
+let dragDistance = 0
+let animationId: number | null = null
+let scrollPos = 0
+const scrollSpeed = 0.25
+
+const displayTemplates = computed(() => {
+  if (!templates.value.length) return []
+  return [...templates.value.slice(0, 8), ...templates.value.slice(0, 8)]
+})
+
+function startAutoScroll() {
+  const track = templateTrackRef.value
+  if (!track) return
+  const halfWidth = track.scrollWidth / 2
+
+  function step() {
+    if (!isPaused.value && !isDragging.value && track) {
+      scrollPos += scrollSpeed
+      if (scrollPos >= halfWidth) scrollPos = 0
+      track.scrollLeft = scrollPos
+    }
+    animationId = requestAnimationFrame(step)
+  }
+  animationId = requestAnimationFrame(step)
+}
+
+function startTemplateDrag(event: MouseEvent) {
+  if (event.button !== 0) return
+  const track = templateTrackRef.value
+  if (!track) return
+  event.preventDefault()
+  isDragging.value = true
+  dragStartX = event.clientX
+  dragStartScrollLeft = track.scrollLeft
+  dragDistance = 0
+}
+
+function moveTemplateDrag(event: MouseEvent) {
+  if (!isDragging.value) return
+  const track = templateTrackRef.value
+  if (!track) return
+  event.preventDefault()
+  dragDistance = event.clientX - dragStartX
+  track.scrollLeft = dragStartScrollLeft - dragDistance
+  scrollPos = track.scrollLeft
+}
+
+function endTemplateDrag() {
+  if (!isDragging.value) return
+  isDragging.value = false
+  scrollPos = templateTrackRef.value?.scrollLeft || 0
+}
+
+function preventTemplateClick(event: MouseEvent) {
+  if (Math.abs(dragDistance) < 6) return
+  event.preventDefault()
+  event.stopPropagation()
+  dragDistance = 0
+}
+
 onMounted(async () => {
-  templates.value = await listTemplatesApi()
+  try {
+    templates.value = await listTemplatesApi()
+  } catch {
+    templates.value = []
+  }
+  await nextTick()
+  if (templates.value.length) startAutoScroll()
+})
+
+onUnmounted(() => {
+  if (animationId) cancelAnimationFrame(animationId)
 })
 </script>
 
 <template>
-  <section class="bg-[#fafafa] py-12 sm:py-32 border-t border-zinc-100">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl text-center mb-8 sm:mb-16">
-        <h2 class="text-xl font-medium tracking-tight text-zinc-900 sm:text-4xl">精心打磨的极简模板</h2>
-        <p class="mt-3 sm:mt-4 text-sm sm:text-lg text-zinc-500">抛弃花哨，专注于排版的黄金分割。完美兼容各大厂 ATS 系统解析。</p>
+  <section class="home-section template-section" aria-labelledby="template-title">
+    <div class="section-heading template-heading">
+      <div>
+        <p class="section-kicker">为内容留出呼吸感</p>
+        <ScrollFloat
+          id="template-title"
+          container-class-name="template-scroll-title"
+          text-class-name="home-scroll-float-text"
+          :animation-duration="0.85"
+          ease="power3.out"
+          scroll-start="top bottom-=8%"
+          scroll-end="center center+=14%"
+          :stagger="0.028"
+        >专业，不必千篇一律。</ScrollFloat>
       </div>
-      <div class="grid grid-cols-2 gap-3.5 sm:gap-8 lg:grid-cols-4">
-        <div v-for="item in templates.slice(0, 4)" :key="item.template_id" class="group relative rounded-[1.5rem] sm:rounded-[2rem] bg-white p-2 sm:p-2.5 shadow-sm ring-1 ring-zinc-100 transition-all duration-500 hover:shadow-2xl hover:shadow-zinc-200/50 hover:ring-zinc-200 hover:-translate-y-2">
-          <div class="relative w-full aspect-[1/1.1] overflow-hidden rounded-[1.2rem] sm:rounded-[1.5rem] bg-zinc-50 pointer-events-none border border-zinc-100/80">
-             <div class="absolute inset-x-0 top-0 w-full transform transition-transform duration-700 ease-out group-hover:scale-[1.05]">
-               <TemplatePreview :html="item.preview_html" />
-             </div>
-             <!-- Soft fade at bottom -->
-             <div class="absolute inset-x-0 bottom-0 h-16 sm:h-24 bg-gradient-to-t from-zinc-50 via-zinc-50/80 to-transparent pointer-events-none"></div>
-          </div>
-          <div class="mt-3 sm:mt-5 mb-1 sm:mb-2 flex items-center justify-between px-2 sm:px-3">
-            <div class="text-xs sm:text-base font-medium tracking-tight text-zinc-900 truncate mr-1">{{ item.name }}</div>
-            <span class="shrink-0 inline-flex items-center rounded-full bg-zinc-100 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] font-semibold text-zinc-600 transition-colors group-hover:bg-zinc-900 group-hover:text-white uppercase tracking-wider">
-              {{ item.category }}
-            </span>
-          </div>
-        </div>
+      <RouterLink to="/templates">查看全部模板 <ArrowRight :size="17" /></RouterLink>
+    </div>
+
+    <div class="template-stage" :class="{ 'has-live-templates': templates.length }">
+      <div
+        ref="templateTrackRef"
+        class="template-track"
+        :class="{ 'is-dragging': isDragging }"
+        aria-label="拖动浏览简历模板"
+        @mouseenter="isPaused = true"
+        @mouseleave="isPaused = false"
+        @mousedown="startTemplateDrag"
+        @mousemove="moveTemplateDrag"
+        @mouseup="endTemplateDrag"
+        @dragstart.prevent
+      >
+        <template v-if="templates.length">
+          <RouterLink v-for="(item, index) in displayTemplates" :key="`${item.template_id}-${index}`" to="/templates" class="template-card" :class="`template-card-${index % 3 + 1}`" @click="preventTemplateClick">
+            <div class="template-preview"><TemplatePreview :html="item.preview_html" /></div>
+            <div class="template-caption"><span>{{ item.name }}</span><small>{{ item.category }}</small></div>
+          </RouterLink>
+        </template>
+        <template v-else>
+          <RouterLink v-for="(name, index) in ['清晰叙事', '专业极简', '技术聚焦']" :key="name" to="/templates" class="template-card template-placeholder" :class="`template-card-${index + 1}`" @click="preventTemplateClick">
+            <div class="placeholder-paper"><b></b><i></i><i></i><h3></h3><p></p><p></p><h3></h3><p></p><p></p></div>
+            <div class="template-caption"><span>{{ name }}</span><small>ATS FRIENDLY</small></div>
+          </RouterLink>
+        </template>
       </div>
     </div>
   </section>

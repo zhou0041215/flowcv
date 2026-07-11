@@ -1,47 +1,48 @@
 <script setup lang="ts">
-import { Sparkles, FileText, LayoutTemplate, Share } from "lucide-vue-next"
-const features = [
-  {
-    icon: Sparkles,
-    title: "智能提炼",
-    desc: "将零散的经历转化为专业的表达，精准突出你的核心竞争力。"
-  },
-  {
-    icon: LayoutTemplate,
-    title: "极简排版",
-    desc: "多套经过设计师打磨的模板，完美平衡美观与 ATS 兼容性。"
-  },
-  {
-    icon: FileText,
-    title: "实时双栏",
-    desc: "内容与样式分离。左侧专注内容编辑，右侧实时预览最终效果。"
-  },
-  {
-    icon: Share,
-    title: "一键导出",
-    desc: "支持高清晰度 PDF 导出，无论打印还是在线投递都保持完美。"
-  }
-]
+import { ArrowUpRight, BriefcaseBusiness, FileCheck2, WandSparkles } from "lucide-vue-next"
+import ScrollFloat from "@/components/ui/ScrollFloat.vue"
 </script>
 
 <template>
-  <section class="bg-white py-12 sm:py-32 overflow-hidden">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl text-center">
-        <h2 class="text-xl sm:text-4xl font-medium tracking-tight text-zinc-900 whitespace-nowrap sm:whitespace-normal">少一点格式负担，多一点内容表达</h2>
-        <p class="mt-3 sm:mt-4 text-sm sm:text-lg text-zinc-500 font-normal">去掉繁琐的排版流程，把重点留给经历梳理、内容优化和最终呈现。</p>
-      </div>
-      <div class="mx-auto mt-8 sm:mt-20 lg:mt-24 lg:max-w-none">
-        <div class="grid max-w-none grid-cols-4 gap-2 sm:gap-8">
-          <div v-for="feature in features" :key="feature.title" class="group relative flex flex-col items-center justify-center text-center p-3 sm:p-8 rounded-2xl sm:rounded-3xl bg-white shadow-sm ring-1 ring-zinc-200/60 hover:ring-zinc-300 transition-all duration-300 hover:shadow-md hover:-translate-y-1 aspect-square sm:aspect-auto">
-            <div class="mb-2 sm:mb-6 flex h-10 w-10 sm:h-14 sm:w-14 items-center justify-center rounded-xl sm:rounded-2xl sm:bg-zinc-50 sm:border sm:border-zinc-100 transition-transform duration-300 group-hover:scale-105">
-              <component :is="feature.icon" class="h-4.5 w-4.5 sm:h-6 sm:w-6 text-zinc-700 transition-colors duration-300 group-hover:text-zinc-900" />
-            </div>
-            <h3 class="text-xs sm:text-lg font-semibold text-zinc-900 tracking-tight whitespace-nowrap">{{ feature.title }}</h3>
-            <p class="hidden sm:block mt-3 text-sm text-zinc-500 leading-relaxed font-normal">{{ feature.desc }}</p>
-          </div>
+  <section class="home-section feature-section" aria-labelledby="feature-title">
+    <div class="section-heading feature-heading">
+      <p class="section-kicker">一份持续成长的职业档案</p>
+      <ScrollFloat
+        id="feature-title"
+        container-class-name="feature-scroll-title"
+        text-class-name="home-scroll-float-text"
+        :animation-duration="0.9"
+        ease="power3.out"
+        scroll-start="top bottom-=8%"
+        scroll-end="center center+=12%"
+        :stagger="0.022"
+      >不是替你包装，而是帮你找到真正有价值的表达。</ScrollFloat>
+      <p>每一次建议都能追溯、比较和选择。你始终掌握简历内容，AI 负责把信息整理得更准确。</p>
+    </div>
+
+    <div class="feature-grid">
+      <article class="feature-card feature-ai">
+        <div class="feature-card-head"><span class="feature-icon"><WandSparkles :size="19" /></span><b>AI 表达教练</b><ArrowUpRight :size="20" /></div>
+        <div class="diff-window">
+          <div class="diff-toolbar"><span></span><span></span><span></span><small>正在优化 · 项目经历</small></div>
+          <p class="diff-before"><del>负责产品需求和页面设计，配合团队完成项目。</del></p>
+          <p class="diff-after">主导核心流程重构，推动设计与研发协作，使任务完成效率提升 <strong>38%</strong>。</p>
+          <div class="diff-actions"><button>保留原文</button><button>应用建议</button></div>
         </div>
-      </div>
+      </article>
+
+      <article class="feature-card feature-match">
+        <div class="feature-card-head"><span class="feature-icon"><BriefcaseBusiness :size="19" /></span><b>岗位匹配分析</b><ArrowUpRight :size="20" /></div>
+        <div class="match-score"><strong>91</strong><span>%</span><i></i></div>
+        <p>已覆盖 8 项关键要求</p>
+        <div class="match-tags"><span>用户研究</span><span>产品策略</span><span>数据分析</span></div>
+      </article>
+
+      <article class="feature-card feature-export">
+        <div class="feature-card-head"><span class="feature-icon"><FileCheck2 :size="19" /></span><b>多端一致导出</b><ArrowUpRight :size="20" /></div>
+        <div class="export-stack"><span>PDF</span><span>WORD</span><span>LINK</span></div>
+        <p>预览、PDF 与 Word 保持同一套版式语言。</p>
+      </article>
     </div>
   </section>
 </template>

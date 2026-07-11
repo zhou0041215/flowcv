@@ -12,12 +12,14 @@ const props = defineProps<{
   suggestions?: string[]
   applyLabel?: string
   emptyText?: string
+  selectable?: boolean
 }>()
 
 const emit = defineEmits<{ close: []; apply: [selectedIds: string[]] }>()
 const selectedIds = ref<string[]>([])
 
 const allChangeIds = computed(() => props.sections.flatMap((section) => section.changes.map((change) => change.id)))
+const selectable = computed(() => props.selectable !== false)
 
 watch(
   () => [props.open, allChangeIds.value.join("|")],
@@ -122,9 +124,9 @@ function applySelected() {
                 </div>
 
                 <div class="mt-3 sm:mt-4 space-y-5 sm:space-y-4">
-                  <article v-for="(change, index) in section.changes" :key="`${change.kind}-${change.title}-${index}`" class="sm:rounded-xl sm:border border-zinc-100 sm:bg-zinc-50/70 sm:p-4" :class="{ 'opacity-50': !selectedIds.includes(change.id) }">
+                  <article v-for="(change, index) in section.changes" :key="`${change.kind}-${change.title}-${index}`" class="sm:rounded-xl sm:border border-zinc-100 sm:bg-zinc-50/70 sm:p-4" :class="{ 'opacity-50': selectable && !selectedIds.includes(change.id) }">
                     <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <button type="button" class="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-full border transition" :class="selectedIds.includes(change.id) ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 bg-white text-transparent'" @click="toggleChange(change.id)">
+                      <button v-if="selectable" type="button" class="mr-1 inline-flex h-6 w-6 items-center justify-center rounded-full border transition" :class="selectedIds.includes(change.id) ? 'border-blue-600 bg-blue-600 text-white' : 'border-zinc-300 bg-white text-transparent'" @click="toggleChange(change.id)">
                         <Check class="h-3.5 w-3.5" />
                       </button>
                       <span class="inline-flex h-6 w-6 items-center justify-center rounded-full" :class="diffIconClass[change.kind]">
@@ -162,7 +164,7 @@ function applySelected() {
 
           <footer class="flex shrink-0 items-center justify-end gap-2 sm:gap-3 border-t border-zinc-100 bg-white px-4 sm:px-6 py-3 sm:py-4">
             <Button variant="outline" class="whitespace-nowrap px-3 sm:px-4 text-xs sm:text-sm" @click="$emit('close')">返回检查</Button>
-            <Button :disabled="!selectedCount" class="whitespace-nowrap px-3 sm:px-4 text-xs sm:text-sm" @click="applySelected">{{ applyLabel || "采纳优化结果" }}{{ selectedCount ? `（${selectedCount}项）` : "" }}</Button>
+            <Button :disabled="!selectedCount" class="whitespace-nowrap px-3 sm:px-4 text-xs sm:text-sm" @click="applySelected">{{ applyLabel || "采纳优化结果" }}{{ selectable && selectedCount ? `（${selectedCount}项）` : "" }}</Button>
           </footer>
         </div>
       </div>

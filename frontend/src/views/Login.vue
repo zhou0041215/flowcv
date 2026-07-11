@@ -13,7 +13,7 @@ import Button from "@/components/ui/button/Button.vue"
 import Input from "@/components/ui/input/Input.vue"
 import Label from "@/components/ui/label/Label.vue"
 import BrandLogo from "@/components/common/BrandLogo.vue"
-import { Check, X } from "lucide-vue-next"
+import { ArrowRight, Check, ShieldCheck, X } from "lucide-vue-next"
 
 const router = useRouter()
 const route = useRoute()
@@ -26,13 +26,11 @@ const showAgreementModal = ref(false)
 const userAgreementContent = ref("")
 const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
-// Login State
 const loginEmail = ref("")
 const loginPassword = ref("")
 const loginError = ref("")
 const loginSuccess = ref("")
 
-// Register State
 const regForm = ref({ username: "", email: "", password: "", verification_code: "" })
 const regError = ref("")
 const regSuccess = ref("")
@@ -40,7 +38,6 @@ const codeSeconds = ref(0)
 const sendingCode = ref(false)
 let countdownTimer: number | undefined
 
-// Password Reset State
 const resetForm = ref({ email: "", verification_code: "", new_password: "" })
 const resetError = ref("")
 const resetSuccess = ref("")
@@ -49,9 +46,7 @@ const sendingResetCode = ref(false)
 let resetCountdownTimer: number | undefined
 
 onMounted(async () => {
-  if (route.path === '/register') {
-    isRegister.value = true
-  }
+  if (route.path === "/register") isRegister.value = true
   try {
     const res = await getUserAgreementApi()
     userAgreementContent.value = res.user_agreement
@@ -61,7 +56,7 @@ onMounted(async () => {
 })
 
 watch(() => route.path, (newPath) => {
-  isRegister.value = newPath === '/register'
+  isRegister.value = newPath === "/register"
   if (isRegister.value) isForgotPassword.value = false
 })
 
@@ -90,9 +85,7 @@ async function handleLogin() {
     loginError.value = ""
     loginSuccess.value = ""
     if (!agreed.value) throw new Error("请先阅读并同意用户协议")
-    if (!emailPattern.test(loginEmail.value.trim())) {
-      throw new Error("请输入正确的邮箱地址")
-    }
+    if (!emailPattern.test(loginEmail.value.trim())) throw new Error("请输入正确的邮箱地址")
     if (!loginPassword.value) throw new Error("请输入密码")
     await user.login(loginEmail.value, loginPassword.value)
     router.push("/resumes")
@@ -105,12 +98,10 @@ async function sendCode() {
   try {
     regError.value = ""
     regSuccess.value = ""
-    if (!emailPattern.test(regForm.value.email.trim())) {
-      throw new Error("请输入正确的邮箱地址")
-    }
+    if (!emailPattern.test(regForm.value.email.trim())) throw new Error("请输入正确的邮箱地址")
     sendingCode.value = true
     await sendVerificationCodeApi(regForm.value.email)
-    regSuccess.value = "验证码已发送...如果没有请检查垃圾邮件"
+    regSuccess.value = "验证码已发送，如果没有收到请检查垃圾邮件"
     codeSeconds.value = 60
     countdownTimer = window.setInterval(() => {
       codeSeconds.value -= 1
@@ -137,18 +128,13 @@ async function handleRegister() {
     regSuccess.value = ""
     if (!agreed.value) throw new Error("请先阅读并同意用户协议")
     if (regForm.value.username.trim().length < 2) throw new Error("用户名至少需要 2 个字符")
-    if (!emailPattern.test(regForm.value.email.trim())) {
-      throw new Error("请输入正确的邮箱地址")
-    }
+    if (!emailPattern.test(regForm.value.email.trim())) throw new Error("请输入正确的邮箱地址")
     if (regForm.value.password.length < 6) throw new Error("密码至少需要 6 个字符")
     if (!/^\d{6}$/.test(regForm.value.verification_code)) throw new Error("请输入 6 位邮箱验证码")
     await registerApi(regForm.value)
-    // auto fill login form
     loginEmail.value = regForm.value.email
     loginPassword.value = regForm.value.password
-    // reset register form
     regForm.value = { username: "", email: "", password: "", verification_code: "" }
-    // auto switch to login
     router.push("/login")
   } catch (e: any) {
     regError.value = e.message
@@ -159,12 +145,10 @@ async function sendResetCode() {
   try {
     resetError.value = ""
     resetSuccess.value = ""
-    if (!emailPattern.test(resetForm.value.email.trim())) {
-      throw new Error("请输入正确的邮箱地址")
-    }
+    if (!emailPattern.test(resetForm.value.email.trim())) throw new Error("请输入正确的邮箱地址")
     sendingResetCode.value = true
     await sendPasswordResetCodeApi(resetForm.value.email)
-    resetSuccess.value = "验证码已发送...如果没有请检查垃圾邮件"
+    resetSuccess.value = "验证码已发送，如果没有收到请检查垃圾邮件"
     resetCodeSeconds.value = 60
     resetCountdownTimer = window.setInterval(() => {
       resetCodeSeconds.value -= 1
@@ -205,201 +189,145 @@ async function handleResetPassword() {
 </script>
 
 <template>
-  <div class="grid min-h-screen grid-cols-1 bg-white lg:grid-cols-2">
-    <!-- Left Dark Panel -->
-    <div class="relative hidden bg-zinc-950 p-12 text-white lg:flex lg:flex-col lg:justify-between overflow-hidden">
-      <!-- subtle background decoration -->
-      <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiLz48L3N2Zz4=')] opacity-50 mix-blend-overlay"></div>
-      
-      <div class="relative z-10">
-        <RouterLink to="/" class="inline-flex w-fit rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
-          <BrandLogo tone="light" />
-        </RouterLink>
-      </div>
-      
-      <div class="relative z-10 max-w-lg">
-        <h1 class="text-4xl sm:text-5xl font-medium tracking-tight leading-[1.15]">
-          你的经历，<br />值得更好的表达。
-        </h1>
-        <p class="mt-6 text-lg text-zinc-400">
-          从内容编辑到 AI 优化，再到 PDF 导出，让简历制作一步到位。
-        </p>
-      </div>
-      
-      <div class="relative z-10 flex flex-col gap-1">
-        <p class="text-sm text-zinc-600">&copy; 2026 <a href="https://github.com/cgz233/vitaflow" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-400 transition-colors">VitaFlow</a></p>
-        <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer" class="text-xs text-zinc-500 hover:text-zinc-400 transition-colors">
-          鲁ICP备2023002307号-2
-        </a>
-      </div>
-    </div>
+  <div id="vita-auth-page" class="auth-page">
+    <div class="auth-grid" aria-hidden="true"></div>
+    <header class="auth-topbar">
+      <RouterLink to="/" class="brand-link" aria-label="返回 VitaFlow 首页">
+        <BrandLogo size="sm" />
+      </RouterLink>
+      <div class="workspace-status"><span class="status-light"></span>AI RESUME WORKSPACE</div>
+    </header>
 
-    <!-- Right Form Area with Flip -->
-    <div class="flex flex-col items-center justify-center p-4 sm:p-6 bg-white perspective-1000 relative">
-      <!-- mobile logo -->
-      <div class="w-full max-w-sm mb-6 lg:hidden">
-        <RouterLink to="/" class="inline-flex rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900">
-          <BrandLogo />
-        </RouterLink>
-      </div>
+    <main class="auth-layout">
+      <section class="story-panel" aria-labelledby="auth-story-title">
+        <div class="story-copy">
+          <p class="story-eyebrow"><span>表达，不止是排版</span></p>
+          <h1 id="auth-story-title" class="story-title">让每一段经历，<span>都落在关键位置。</span></h1>
+          <p class="story-description">VitaFlow 把内容梳理、岗位匹配和专业排版放进同一张工作台，让你的简历更准确，也更有分量。</p>
+        </div>
 
-      <!-- Main Container (No Card Styling) -->
-      <div class="relative w-full max-w-sm h-[590px] flip-container" :class="{ 'flipped': isRegister }">
-        <!-- Flipper -->
-        <div class="flipper w-full h-full relative transition-transform duration-700 ease-[cubic-bezier(0.4,0,0.2,1)]">
-          <!-- Front: Login -->
-          <div class="front absolute w-full h-full bg-white flex flex-col justify-center">
-            <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight">
-              {{ isForgotPassword ? "找回密码" : "欢迎回来" }}
-            </h1>
-            <p class="mt-2 text-sm text-zinc-500">
-              {{ isForgotPassword ? "通过邮箱验证码重置你的登录密码" : "使用邮箱登录你的工作台" }}
-            </p>
-            
-            <div v-if="!isForgotPassword" class="mt-8 flex-1 space-y-5">
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">邮箱</Label>
-                <Input v-model="loginEmail" type="email" placeholder="请输入邮箱" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
-              </div>
-              <div>
-                <div class="flex items-center justify-between">
-                  <Label class="text-zinc-700 text-xs font-medium">密码</Label>
-                  <button type="button" @click="showForgotPassword" class="text-xs font-medium text-zinc-700 hover:text-zinc-950 hover:underline focus:outline-none">
-                    忘记密码？
-                  </button>
-                </div>
-                <Input v-model="loginPassword" type="password" placeholder="请输入密码" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" @keyup.enter="handleLogin" />
-              </div>
-              <div class="flex items-center gap-2 pt-1">
-                <button type="button" @click="agreed = !agreed" class="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white transition-colors focus:outline-none" :class="{ '!border-zinc-900 !bg-zinc-900': agreed }">
-                  <Check v-if="agreed" class="h-3 w-3 text-white stroke-[3]" />
-                </button>
-                <span class="text-xs text-zinc-600 select-none">
-                  我已阅读并同意
-                  <button type="button" @click="showAgreementModal = true" class="text-zinc-900 font-medium hover:underline focus:outline-none">《用户协议》与《隐私政策》</button>
-                </span>
-              </div>
-              <p v-if="loginError" class="text-sm text-red-500">{{ loginError }}</p>
-              <p v-if="loginSuccess" class="text-sm text-green-600 font-medium">{{ loginSuccess }}</p>
-              <Button class="w-full bg-zinc-900 hover:bg-zinc-800 text-white mt-4 h-11 transition-transform active:scale-95" @click="handleLogin">登录</Button>
+        <div class="resume-lab" aria-label="AI 正在校订一份简历的动态示意">
+          <div class="folio-shadow folio-shadow-one"></div>
+          <div class="folio-shadow folio-shadow-two"></div>
+          <article class="resume-sheet">
+            <div class="sheet-meta"><span>PROFILE / 2026</span><span>01 PAGE</span></div>
+            <div class="sheet-heading">
+              <div><p>林知远</p><span>产品设计师 · AI 工具方向</span></div>
+              <div class="sheet-avatar">LZ</div>
             </div>
-
-            <div v-else class="mt-8 flex-1 space-y-5">
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">邮箱</Label>
-                <Input v-model="resetForm.email" type="email" placeholder="请输入注册邮箱" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
+            <div class="sheet-rule"></div>
+            <div class="sheet-columns">
+              <div class="sheet-main">
+                <section>
+                  <p class="sheet-label">核心经历</p>
+                  <div class="sheet-line line-long"></div><div class="sheet-line line-medium"></div><div class="sheet-line line-long"></div>
+                </section>
+                <section>
+                  <p class="sheet-label">项目成果</p>
+                  <div class="sheet-line line-long"></div><div class="sheet-line line-short"></div>
+                  <div class="sheet-highlight">用户激活率提升 32%</div>
+                </section>
               </div>
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">邮箱验证码</Label>
-                <div class="mt-1.5 flex gap-2">
-                  <Input v-model="resetForm.verification_code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" class="focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
-                  <Button type="button" variant="outline" class="w-32 shrink-0" :disabled="sendingResetCode || resetCodeSeconds > 0" @click="sendResetCode">
-                    {{ resetCodeSeconds > 0 ? `${resetCodeSeconds} 秒后重发` : (sendingResetCode ? "发送中..." : "发送验证码") }}
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">新密码</Label>
-                <Input v-model="resetForm.new_password" type="password" placeholder="设置新密码" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" @keyup.enter="handleResetPassword" />
-              </div>
-              <p v-if="resetError" class="text-sm text-red-500">{{ resetError }}</p>
-              <p v-if="resetSuccess" class="text-sm text-green-600 font-medium">{{ resetSuccess }}</p>
-              <Button class="w-full bg-zinc-900 hover:bg-zinc-800 text-white mt-4 h-11 transition-transform active:scale-95" @click="handleResetPassword">重置密码</Button>
-              <Button type="button" variant="outline" class="w-full h-11" @click="backToLogin">返回登录</Button>
+              <aside class="sheet-side"><p class="sheet-label">能力</p><span>产品策略</span><span>交互设计</span><span>数据分析</span></aside>
             </div>
-            
-            <div v-if="!isForgotPassword" class="mt-8 text-center text-sm">
-              <span class="text-zinc-500">还没有账号？</span>
-              <button @click="toggleMode('/register')" class="text-zinc-900 font-medium hover:underline focus:outline-none transition-colors">立即注册</button>
-            </div>
+            <div class="scan-line" aria-hidden="true"><span>AI REVIEWING</span></div>
+            <div class="ai-annotation"><span class="annotation-mark">✓</span><div><strong>表达已校准</strong><small>突出动作、方法与结果</small></div></div>
+          </article>
+          <div class="lab-rail" aria-hidden="true">
+            <span class="rail-label">校订进度</span>
+            <div class="rail-item is-active"><i></i><span>内容</span><b>完成</b></div>
+            <div class="rail-item is-active"><i></i><span>表达</span><b>完成</b></div>
+            <div class="rail-item"><i></i><span>岗位</span><b>分析中</b></div>
           </div>
-          
-          <!-- Back: Register -->
-          <div class="back absolute w-full h-full bg-white flex flex-col justify-center">
-            <h1 class="text-2xl font-semibold text-zinc-900 tracking-tight">创建账号</h1>
-            <p class="mt-2 text-sm text-zinc-500">只需几秒，开启你的极简简历之旅</p>
-            
-            <div class="mt-8 flex-1 space-y-4">
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">用户名</Label>
-                <Input v-model="regForm.username" placeholder="你的昵称" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
-              </div>
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">邮箱</Label>
-                <Input v-model="regForm.email" placeholder="你的邮箱" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
-              </div>
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">密码</Label>
-                <Input v-model="regForm.password" type="password" placeholder="设置密码" class="mt-1.5 focus:ring-zinc-900 focus:border-zinc-900 transition-all" @keyup.enter="handleRegister" />
-              </div>
-              <div>
-                <Label class="text-zinc-700 text-xs font-medium">邮箱验证码</Label>
-                <div class="mt-1.5 flex gap-2">
-                  <Input v-model="regForm.verification_code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" class="focus:ring-zinc-900 focus:border-zinc-900 transition-all" />
-                  <Button type="button" variant="outline" class="w-32 shrink-0" :disabled="sendingCode || codeSeconds > 0" @click="sendCode">
-                    {{ codeSeconds > 0 ? `${codeSeconds} 秒后重发` : (sendingCode ? "发送中..." : "发送验证码") }}
-                  </Button>
+        </div>
+        <div class="story-footer"><span>内容编辑</span><i></i><span>AI 优化</span><i></i><span>PDF / Word 导出</span></div>
+      </section>
+
+      <section class="auth-zone" aria-label="账号登录与注册">
+        <div class="mobile-brand">
+          <RouterLink to="/" class="brand-link" aria-label="返回 VitaFlow 首页"><BrandLogo size="sm" /></RouterLink>
+        </div>
+        <div class="auth-card">
+          <div class="auth-flip" :class="{ flipped: isRegister, 'is-reset': isForgotPassword }">
+            <div class="flipper">
+              <section class="panel-face front">
+                <div class="form-heading">
+                  <p>{{ isForgotPassword ? "ACCOUNT RECOVERY" : "SECURE ACCESS" }}</p>
+                  <h2>{{ isForgotPassword ? "重新设置密码" : "继续你的简历" }}</h2>
+                  <span>{{ isForgotPassword ? "验证邮箱后即可设置新密码。" : "登录后，继续编辑、优化和投递准备。" }}</span>
                 </div>
-              </div>
-              <div class="flex items-center gap-2 pt-1">
-                <button type="button" @click="agreed = !agreed" class="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-zinc-300 bg-white transition-colors focus:outline-none" :class="{ '!border-zinc-900 !bg-zinc-900': agreed }">
-                  <Check v-if="agreed" class="h-3 w-3 text-white stroke-[3]" />
-                </button>
-                <span class="text-xs text-zinc-600 select-none">
-                  我已阅读并同意
-                  <button type="button" @click="showAgreementModal = true" class="text-zinc-900 font-medium hover:underline focus:outline-none">《用户协议》与《隐私政策》</button>
-                </span>
-              </div>
-              <p v-if="regError" class="text-sm text-red-500">{{ regError }}</p>
-              <p v-if="regSuccess" class="text-sm text-green-600 font-medium">{{ regSuccess }}</p>
-              <Button class="w-full bg-zinc-900 hover:bg-zinc-800 text-white mt-2 h-11 transition-transform active:scale-95" @click="handleRegister">注册</Button>
-            </div>
-            
-            <div class="mt-8 text-center text-sm">
-              <span class="text-zinc-500">已有账号？</span>
-              <button @click="toggleMode('/login')" class="text-zinc-900 font-medium hover:underline focus:outline-none transition-colors">直接登录</button>
+
+                <form v-if="!isForgotPassword" class="auth-form" @submit.prevent="handleLogin">
+                  <div class="field-block"><Label class="field-label">邮箱</Label><Input v-model="loginEmail" type="email" autocomplete="email" placeholder="name@example.com" class="auth-input" /></div>
+                  <div class="field-block">
+                    <div class="field-row"><Label class="field-label">密码</Label><button type="button" class="text-action" @click="showForgotPassword">忘记密码</button></div>
+                    <Input v-model="loginPassword" type="password" autocomplete="current-password" placeholder="输入登录密码" class="auth-input" />
+                  </div>
+                  <div class="agreement-row">
+                    <button type="button" class="agreement-check" :class="{ checked: agreed }" :aria-pressed="agreed" aria-label="同意用户协议" @click="agreed = !agreed"><Check v-if="agreed" class="h-3 w-3 stroke-[3]" /></button>
+                    <span>我已阅读并同意 <button type="button" @click="showAgreementModal = true">用户协议与隐私政策</button></span>
+                  </div>
+                  <p v-if="loginError" class="form-message error-message">{{ loginError }}</p>
+                  <p v-if="loginSuccess" class="form-message success-message">{{ loginSuccess }}</p>
+                  <Button type="submit" class="primary-action">进入工作台 <ArrowRight class="h-4 w-4" /></Button>
+                </form>
+
+                <form v-else class="auth-form reset-form" @submit.prevent="handleResetPassword">
+                  <div class="field-block"><Label class="field-label">注册邮箱</Label><Input v-model="resetForm.email" type="email" autocomplete="email" placeholder="name@example.com" class="auth-input" /></div>
+                  <div class="field-block">
+                    <Label class="field-label">邮箱验证码</Label>
+                    <div class="code-row"><Input v-model="resetForm.verification_code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" class="auth-input" /><Button type="button" variant="outline" class="code-button" :disabled="sendingResetCode || resetCodeSeconds > 0" @click="sendResetCode">{{ resetCodeSeconds > 0 ? `${resetCodeSeconds}s` : (sendingResetCode ? "发送中" : "发送验证码") }}</Button></div>
+                  </div>
+                  <div class="field-block"><Label class="field-label">新密码</Label><Input v-model="resetForm.new_password" type="password" autocomplete="new-password" placeholder="至少 6 个字符" class="auth-input" /></div>
+                  <p v-if="resetError" class="form-message error-message">{{ resetError }}</p>
+                  <p v-if="resetSuccess" class="form-message success-message">{{ resetSuccess }}</p>
+                  <Button type="submit" class="primary-action">保存新密码 <ArrowRight class="h-4 w-4" /></Button>
+                  <button type="button" class="secondary-action" @click="backToLogin">返回登录</button>
+                </form>
+
+                <div v-if="!isForgotPassword" class="mode-switch"><span>第一次使用 VitaFlow？</span><button type="button" @click="toggleMode('/register')">创建账号</button></div>
+              </section>
+
+              <section class="panel-face back">
+                <div class="form-heading"><p>CREATE WORKSPACE</p><h2>建立你的简历档案</h2><span>从一份可持续更新的职业档案开始。</span></div>
+                <form class="auth-form register-form" @submit.prevent="handleRegister">
+                  <div class="field-block"><Label class="field-label">用户名</Label><Input v-model="regForm.username" autocomplete="name" placeholder="如何称呼你" class="auth-input" /></div>
+                  <div class="field-block"><Label class="field-label">邮箱</Label><Input v-model="regForm.email" type="email" autocomplete="email" placeholder="name@example.com" class="auth-input" /></div>
+                  <div class="field-block"><Label class="field-label">密码</Label><Input v-model="regForm.password" type="password" autocomplete="new-password" placeholder="至少 6 个字符" class="auth-input" /></div>
+                  <div class="field-block">
+                    <Label class="field-label">邮箱验证码</Label>
+                    <div class="code-row"><Input v-model="regForm.verification_code" inputmode="numeric" maxlength="6" placeholder="6 位验证码" class="auth-input" /><Button type="button" variant="outline" class="code-button" :disabled="sendingCode || codeSeconds > 0" @click="sendCode">{{ codeSeconds > 0 ? `${codeSeconds}s` : (sendingCode ? "发送中" : "发送验证码") }}</Button></div>
+                  </div>
+                  <div class="agreement-row compact-agreement">
+                    <button type="button" class="agreement-check" :class="{ checked: agreed }" :aria-pressed="agreed" aria-label="同意用户协议" @click="agreed = !agreed"><Check v-if="agreed" class="h-3 w-3 stroke-[3]" /></button>
+                    <span>我已阅读并同意 <button type="button" @click="showAgreementModal = true">用户协议与隐私政策</button></span>
+                  </div>
+                  <p v-if="regError" class="form-message error-message">{{ regError }}</p>
+                  <p v-if="regSuccess" class="form-message success-message">{{ regSuccess }}</p>
+                  <Button type="submit" class="primary-action">创建账号 <ArrowRight class="h-4 w-4" /></Button>
+                </form>
+                <div class="mode-switch"><span>已经拥有账号？</span><button type="button" @click="toggleMode('/login')">直接登录</button></div>
+              </section>
             </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <!-- 用户协议弹窗 -->
-    <div v-if="showAgreementModal" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 backdrop-blur-sm p-4 animate-in fade-in-0 duration-200">
-      <div class="relative w-full max-w-2xl rounded-2xl bg-white p-6 sm:p-8 shadow-xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-        <div class="flex items-center justify-between border-b border-zinc-100 pb-4 mb-4 shrink-0">
-          <h3 class="text-lg font-semibold text-zinc-900">用户协议与隐私政策</h3>
-          <button @click="showAgreementModal = false" class="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors focus:outline-none">
-            <X class="h-5 w-5" />
-          </button>
+        <div class="security-note"><ShieldCheck class="h-4 w-4" /><span>你的简历内容仅用于当前工作台，不会公开展示。</span></div>
+        <div class="mobile-footer"><span>&copy; 2026 VitaFlow</span><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">鲁ICP备2023002307号-2</a></div>
+      </section>
+    </main>
+
+    <div v-if="showAgreementModal" class="agreement-modal" role="dialog" aria-modal="true" aria-labelledby="agreement-title">
+      <div class="agreement-card">
+        <div class="agreement-header">
+          <div><p>LEGAL / PRIVACY</p><h3 id="agreement-title">用户协议与隐私政策</h3></div>
+          <button type="button" aria-label="关闭协议" @click="showAgreementModal = false"><X class="h-5 w-5" /></button>
         </div>
-        <div class="overflow-y-auto pr-2 py-2 flex-1 prose max-w-none text-sm text-zinc-600 leading-relaxed" v-html="userAgreementContent || '暂无协议内容'"></div>
-        <div class="border-t border-zinc-100 pt-4 mt-4 flex items-center justify-end shrink-0">
-          <Button @click="showAgreementModal = false; agreed = true" class="bg-zinc-900 hover:bg-zinc-800 text-white px-6 py-2.5 rounded-xl">我已阅读并同意</Button>
-        </div>
+        <div class="agreement-content" v-html="userAgreementContent || '暂无协议内容'"></div>
+        <div class="agreement-footer"><Button class="primary-action agreement-confirm" @click="showAgreementModal = false; agreed = true">我已阅读并同意</Button></div>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-.perspective-1000 {
-  perspective: 1000px;
-}
-.flipper {
-  transform-style: preserve-3d;
-}
-.flip-container.flipped .flipper {
-  transform: rotateY(-180deg);
-}
-.front, .back {
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-.front {
-  transform: rotateY(0deg);
-}
-.back {
-  transform: rotateY(180deg);
-}
-</style>
+<style scoped src="./Login.css"></style>

@@ -15,13 +15,13 @@ from app.models.resume import Resume
 from app.models.resume import ResumeVersion
 from app.models.user import User
 from app.schemas.ai_chat import AiChatMessageOut
+from app.services.ai.agent import plan_resume_agent_turn
 from app.services.ai.chains import (
     localize_ai_text,
     resume_chat_change_repair_chain,
     resume_chat_action_reply_stream,
     resume_chat_chain,
     resume_chat_image_import_chain,
-    resume_chat_intent_chain,
     resume_chat_reply_stream,
     strip_thinking_text,
 )
@@ -840,22 +840,27 @@ def send_chat_message(
     db.add(user_message)
     db.commit()
 
-    intent_result = resume_chat_intent_chain(_chat_intent_payload(payload))
-    if intent_result.intent in {"confirm_change", "reject_change"}:
-        pending_change = _latest_pending_change(db, user.id, resume.id)
-        if pending_change:
-            action = "apply" if intent_result.intent == "confirm_change" else "reject"
-            resolve_chat_change(db, user, resume, pending_change.id, action)
-            reply = "修改已经写入简历。" if action == "apply" else "本次修改已取消。"
-            assistant_message = _save_assistant_message(
-                db, session, user, resume, reply, [], None
-            )
-            return list_chat_messages(db, user.id, resume.id), assistant_message
+    pending_change = _latest_pending_change(db, user.id, resume.id)
+    agent_plan = plan_resume_agent_turn(
+        _chat_intent_payload(payload),
+        pending_change_available=pending_change is not None,
+    )
+    intent_result = agent_plan.intent
+    if agent_plan.route in {"apply_change", "reject_change"} and pending_change:
+        action = "apply" if agent_plan.route == "apply_change" else "reject"
+        resolve_chat_change(db, user, resume, pending_change.id, action)
+        reply = "修改已经写入简历。" if action == "apply" else "本次修改已取消。"
+        assistant_message = _save_assistant_message(
+            db, session, user, resume, reply, [], None
+        )
+        return list_chat_messages(db, user.id, resume.id), assistant_message
+
+    if agent_plan.route == "missing_pending_change":
         reply = "当前没有待确认的修改。你可以告诉我想调整哪一部分，我会重新生成一份可确认的方案。"
         assistant_message = _save_assistant_message(db, session, user, resume, reply, [], None)
         return list_chat_messages(db, user.id, resume.id), assistant_message
 
-    if intent_result.intent in {"answer", "clarify"}:
+    if agent_plan.route == "answer":
         reply_payload = _direct_reply_payload(payload, intent_result)
         reply = localize_ai_text("".join(resume_chat_reply_stream(reply_payload)).strip())
         if not reply:
@@ -977,43 +982,47 @@ def stream_chat_message(
     yield {"type": "start", "data": {"user_message_id": user_message.id}}
     try:
         yield {"type": "phase", "phase": "understanding_intent", "text": "正在结合对话理解你的意图"}
-        intent_result = resume_chat_intent_chain(_chat_intent_payload(payload))
+        pending_change = _latest_pending_change(db, user.id, resume.id)
+        agent_plan = plan_resume_agent_turn(
+            _chat_intent_payload(payload),
+            pending_change_available=pending_change is not None,
+        )
+        intent_result = agent_plan.intent
 
-        if intent_result.intent in {"confirm_change", "reject_change"}:
-            pending_change = _latest_pending_change(db, user.id, resume.id)
-            if pending_change:
-                decision = "apply" if intent_result.intent == "confirm_change" else "reject"
-                resolved_message, resume_data = resolve_chat_change(
-                    db, user, resume, pending_change.id, decision
-                )
-                action_result = {
-                    "status": "applied" if decision == "apply" else "rejected",
-                    "message": "修改已经写入简历" if decision == "apply" else "本次修改已取消",
-                    "suggestions": resolved_message.suggestions,
-                }
-                reply_chunks: list[str] = []
-                try:
-                    for text in resume_chat_action_reply_stream({"action_result": action_result}):
-                        reply_chunks.append(text)
-                        yield {"type": "delta", "text": text}
-                    reply = localize_ai_text("".join(reply_chunks).strip())
-                except Exception:
-                    reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
-                    yield {"type": "delta", "text": reply}
-                if not reply:
-                    reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
-                    yield {"type": "delta", "text": reply}
-                confirmation = _save_assistant_message(db, session, user, resume, reply, [], None)
-                yield {
-                    "type": "result",
-                    "data": {
-                        "assistant_message": confirmation.model_dump(mode="json"),
-                        "resolved_message": resolved_message.model_dump(mode="json"),
-                        "resume_data": resume_data,
-                    },
-                }
-                return
+        if agent_plan.route in {"apply_change", "reject_change"} and pending_change:
+            decision = "apply" if agent_plan.route == "apply_change" else "reject"
+            resolved_message, resume_data = resolve_chat_change(
+                db, user, resume, pending_change.id, decision
+            )
+            action_result = {
+                "status": "applied" if decision == "apply" else "rejected",
+                "message": "修改已经写入简历" if decision == "apply" else "本次修改已取消",
+                "suggestions": resolved_message.suggestions,
+            }
+            reply_chunks: list[str] = []
+            try:
+                for text in resume_chat_action_reply_stream({"action_result": action_result}):
+                    reply_chunks.append(text)
+                    yield {"type": "delta", "text": text}
+                reply = localize_ai_text("".join(reply_chunks).strip())
+            except Exception:
+                reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
+                yield {"type": "delta", "text": reply}
+            if not reply:
+                reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
+                yield {"type": "delta", "text": reply}
+            confirmation = _save_assistant_message(db, session, user, resume, reply, [], None)
+            yield {
+                "type": "result",
+                "data": {
+                    "assistant_message": confirmation.model_dump(mode="json"),
+                    "resolved_message": resolved_message.model_dump(mode="json"),
+                    "resume_data": resume_data,
+                },
+            }
+            return
 
+        if agent_plan.route == "missing_pending_change":
             reply = "当前没有待确认的修改。你可以告诉我想调整哪一部分，我会重新生成一份可确认的方案。"
             yield {"type": "delta", "text": reply}
             assistant_message = _save_assistant_message(db, session, user, resume, reply, [], None)
@@ -1023,7 +1032,7 @@ def stream_chat_message(
             }
             return
 
-        if intent_result.intent in {"answer", "clarify"}:
+        if agent_plan.route == "answer":
             reply_payload = _direct_reply_payload(payload, intent_result)
             yield {"type": "phase", "phase": "replying", "text": "正在组织回复"}
             reply_chunks: list[str] = []
@@ -1158,43 +1167,47 @@ def stream_regenerate_chat_message(
     yield {"type": "start", "data": {"user_message_id": user_message.id}}
     try:
         yield {"type": "phase", "phase": "understanding_intent", "text": "正在重新理解这条消息"}
-        intent_result = resume_chat_intent_chain(_chat_intent_payload(payload))
+        pending_change = _latest_pending_change(db, user.id, resume.id)
+        agent_plan = plan_resume_agent_turn(
+            _chat_intent_payload(payload),
+            pending_change_available=pending_change is not None,
+        )
+        intent_result = agent_plan.intent
 
-        if intent_result.intent in {"confirm_change", "reject_change"}:
-            pending_change = _latest_pending_change(db, user.id, resume.id)
-            if pending_change:
-                decision = "apply" if intent_result.intent == "confirm_change" else "reject"
-                resolved_message, resume_data = resolve_chat_change(
-                    db, user, resume, pending_change.id, decision
-                )
-                action_result = {
-                    "status": "applied" if decision == "apply" else "rejected",
-                    "message": "修改已经写入简历" if decision == "apply" else "本次修改已取消",
-                    "suggestions": resolved_message.suggestions,
-                }
-                reply_chunks: list[str] = []
-                try:
-                    for text in resume_chat_action_reply_stream({"action_result": action_result}):
-                        reply_chunks.append(text)
-                        yield {"type": "delta", "text": text}
-                    reply = localize_ai_text("".join(reply_chunks).strip())
-                except Exception:
-                    reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
-                    yield {"type": "delta", "text": reply}
-                if not reply:
-                    reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
-                    yield {"type": "delta", "text": reply}
-                confirmation = _save_assistant_message(db, session, user, resume, reply, [], None)
-                yield {
-                    "type": "result",
-                    "data": {
-                        "assistant_message": confirmation.model_dump(mode="json"),
-                        "resolved_message": resolved_message.model_dump(mode="json"),
-                        "resume_data": resume_data,
-                    },
-                }
-                return
+        if agent_plan.route in {"apply_change", "reject_change"} and pending_change:
+            decision = "apply" if agent_plan.route == "apply_change" else "reject"
+            resolved_message, resume_data = resolve_chat_change(
+                db, user, resume, pending_change.id, decision
+            )
+            action_result = {
+                "status": "applied" if decision == "apply" else "rejected",
+                "message": "修改已经写入简历" if decision == "apply" else "本次修改已取消",
+                "suggestions": resolved_message.suggestions,
+            }
+            reply_chunks: list[str] = []
+            try:
+                for text in resume_chat_action_reply_stream({"action_result": action_result}):
+                    reply_chunks.append(text)
+                    yield {"type": "delta", "text": text}
+                reply = localize_ai_text("".join(reply_chunks).strip())
+            except Exception:
+                reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
+                yield {"type": "delta", "text": reply}
+            if not reply:
+                reply = "修改已经写入简历。" if decision == "apply" else "本次修改已取消。"
+                yield {"type": "delta", "text": reply}
+            confirmation = _save_assistant_message(db, session, user, resume, reply, [], None)
+            yield {
+                "type": "result",
+                "data": {
+                    "assistant_message": confirmation.model_dump(mode="json"),
+                    "resolved_message": resolved_message.model_dump(mode="json"),
+                    "resume_data": resume_data,
+                },
+            }
+            return
 
+        if agent_plan.route == "missing_pending_change":
             reply = "当前没有待确认的修改。你可以告诉我想调整哪一部分，我会重新生成一份可确认的方案。"
             yield {"type": "delta", "text": reply}
             assistant_message = _save_assistant_message(db, session, user, resume, reply, [], None)
@@ -1204,7 +1217,7 @@ def stream_regenerate_chat_message(
             }
             return
 
-        if intent_result.intent in {"answer", "clarify"}:
+        if agent_plan.route == "answer":
             reply_payload = _direct_reply_payload(payload, intent_result)
             yield {"type": "phase", "phase": "replying", "text": "正在组织回复"}
             reply_chunks: list[str] = []

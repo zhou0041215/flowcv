@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch, computed } from "vue"
-import { CheckCircle2, LoaderCircle, SendHorizontal, Bot, Search, Target, Wand2, Scissors, Trash2, X, ImagePlus, XCircle, Copy, Check, RotateCcw, Cpu, AlertCircle } from "lucide-vue-next"
+import { CheckCircle2, LoaderCircle, SendHorizontal, Bot, Search, Target, Wand2, Scissors, Trash2, X, ImagePlus, XCircle, Copy, Check, RotateCcw, Cpu, AlertCircle, ListChecks } from "lucide-vue-next"
 import Button from "@/components/ui/button/Button.vue"
 import Select from "@/components/ui/select/Select.vue"
 import ConfirmDialog from "@/components/ui/dialog/ConfirmDialog.vue"
+import AiChangeReviewModal from "@/components/ai/AiChangeReviewModal.vue"
 import { renderMarkdown } from "@/lib/markdown"
 import { uploadAiChatImageApi } from "@/api/file"
 import type { AiChatAttachment, AiChatModelOption } from "@/api/ai"
+import { diffResume } from "@/utils/aiDiff"
 
 type ChatMessage = {
   id: number | string
@@ -30,6 +32,7 @@ const props = defineProps<{
   supportsMultimodal?: boolean
   chatModels?: AiChatModelOption[]
   selectedModelId?: number | null
+  currentResumeData?: unknown
 }>()
 
 const emit = defineEmits<{
@@ -52,6 +55,39 @@ const uploadingImage = ref(false)
 const uploadError = ref("")
 const copiedAttachmentUrl = ref("")
 const regenerateSource = ref<ChatMessage | null>(null)
+const reviewMessage = ref<ChatMessage | null>(null)
+
+const reviewSections = computed(() =>
+  diffResume(props.currentResumeData, reviewMessage.value?.optimized_resume_data),
+)
+const changeCountByMessageId = computed(() => {
+  const counts = new Map<number | string, number>()
+  props.messages.forEach((message) => {
+    if (!message.optimized_resume_data) return
+    const count = diffResume(props.currentResumeData, message.optimized_resume_data)
+      .reduce((total, section) => total + section.changes.length, 0)
+    if (count) counts.set(message.id, count)
+  })
+  return counts
+})
+
+function messageChangeCount(message: ChatMessage) {
+  return changeCountByMessageId.value.get(message.id) || 0
+}
+
+function openChangeReview(message: ChatMessage) {
+  reviewMessage.value = message
+}
+
+function closeChangeReview() {
+  reviewMessage.value = null
+}
+
+function confirmReviewedChange() {
+  const message = reviewMessage.value
+  closeChangeReview()
+  if (message) emit("confirm", message)
+}
 
 function confirmClear() {
   emit('clear')
@@ -300,7 +336,13 @@ watch(
                 </div>
 
                 <div v-if="message.role === 'assistant' && !message.streaming && ['pending', 'applying'].includes(actionStatus(message))" class="mt-4 flex flex-wrap items-center gap-2 border-t border-zinc-100 pt-4">
-                  <span class="mr-auto min-w-[180px] text-xs md:text-[13px] font-medium text-zinc-600">是否确认将这些修改写入简历？</span>
+                  <div class="mr-auto flex min-w-[180px] flex-wrap items-center gap-2">
+                    <span class="text-xs md:text-[13px] font-medium text-zinc-600">是否确认将这些修改写入简历？</span>
+                    <button v-if="messageChangeCount(message)" type="button" class="inline-flex h-8 items-center gap-1.5 rounded-full bg-blue-50 px-3 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:opacity-50" :disabled="decisionLoadingId === message.id" @click="openChangeReview(message)">
+                      <ListChecks class="h-3.5 w-3.5" />
+                      查看 {{ messageChangeCount(message) }} 项变更
+                    </button>
+                  </div>
                   <button type="button" class="h-8 rounded-full px-3 text-xs md:text-[13px] font-medium text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-50" :disabled="decisionLoadingId === message.id" @click="emit('reject', message)">取消</button>
                   <Button type="button" size="sm" class="h-8 rounded-full bg-zinc-900 px-4 text-xs md:text-[13px] font-medium text-white hover:bg-zinc-800" :disabled="decisionLoadingId === message.id" @click="emit('confirm', message)">
                     <LoaderCircle v-if="decisionLoadingId === message.id" class="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -397,6 +439,18 @@ watch(
       </div>
     </Transition>
   </Teleport>
+
+  <AiChangeReviewModal
+    :open="Boolean(reviewMessage)"
+    title="确认 AI 简历修改"
+    subtitle="请先核对新增、修改和删除内容；确认后才会写入当前简历，并保留修改前版本。"
+    :sections="reviewSections"
+    :suggestions="reviewMessage?.suggestions || []"
+    :selectable="false"
+    apply-label="确认全部修改"
+    @close="closeChangeReview"
+    @apply="confirmReviewedChange"
+  />
 
   <!-- Error Toast -->
   <Teleport to="body">

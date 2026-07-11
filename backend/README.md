@@ -79,6 +79,19 @@ macOS 本地开发建议保持 `PDF_CHROMIUM_EXECUTABLE_PATH` 为空，让 Playw
 - 简历翻译通过独立 AI 任务执行，保持模块结构、事实字段和富文本格式，并由 Flow Points 规则单独计费。
 - 头像存储通过统一存储服务封装，`STORAGE_PROVIDER=minio` 使用 MinIO，`STORAGE_PROVIDER=aliyun_oss` 使用阿里云 OSS。
 
+## Resume Agent
+
+简历对话由 `app/services/ai/agent.py` 中的 LangGraph 先生成单轮执行计划，再由
+`ai_chat_service` 调用现有领域工具完成回复、生成修改、确认写入或取消操作。
+
+- `answer`：只回答问题，不生成可写入数据。
+- `propose_change`：生成完整候选简历并通过现有事实、数字和结构校验，结果保持待确认状态。
+- `apply_change` / `reject_change`：只有存在待确认修改时才能执行。
+- `missing_pending_change`：阻止模型在没有候选修改时误报已经写入或取消。
+
+Agent 不直接绕过业务服务写数据库。所有候选修改仍由聊天服务校验，用户确认后先创建
+`ResumeVersion` 快照，再写入当前简历。
+
 ## 对象存储
 
 默认使用 MinIO：

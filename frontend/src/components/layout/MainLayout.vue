@@ -11,6 +11,7 @@ const user = useUserStore()
 const router = useRouter()
 const route = useRoute()
 const loggedIn = computed(() => Boolean(user.token))
+const isHome = computed(() => route.path === "/")
 const mobileMenuOpen = ref(false)
 
 onMounted(() => {
@@ -26,7 +27,7 @@ function logout() {
 
 <template>
   <div class="min-h-screen bg-zinc-50/50">
-    <header class="sticky top-0 z-20 border-b border-zinc-200/60 bg-white/80 backdrop-blur-md">
+    <header :class="isHome ? 'home-nav-shell' : 'sticky top-0 z-20 border-b border-zinc-200/60 bg-white/80 backdrop-blur-md'">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <RouterLink to="/" class="inline-flex items-center rounded-lg transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500" @click="mobileMenuOpen = false">
           <BrandLogo />
@@ -236,6 +237,30 @@ function logout() {
 </template>
 
 <style scoped>
+#app#app .home-nav-shell {
+  position: absolute;
+  z-index: 50;
+  top: 24px;
+  left: 50%;
+  width: min(calc(100% - 72px), 1120px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 14px 40px rgba(27, 62, 93, 0.12);
+  backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+  animation: nav-arrive 0.7s 0.08s both cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes nav-arrive {
+  from { opacity: 0; transform: translate(-50%, -14px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+@media (max-width: 640px) {
+  #app#app .home-nav-shell { top: 12px; width: calc(100% - 28px); }
+}
+
 .mobile-menu-enter-active,
 .mobile-menu-leave-active {
   transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -244,5 +269,9 @@ function logout() {
 .mobile-menu-leave-to {
   opacity: 0;
   transform: translateY(-8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app#app .home-nav-shell { animation: none; }
 }
 </style>
