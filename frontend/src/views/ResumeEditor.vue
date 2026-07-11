@@ -111,7 +111,7 @@ async function selectTemplate(templateId: string) {
   showGlobalToast("已应用新模板并保存", "success")
 }
 type SidePanel = "none" | "style" | "chat" | "score" | "jd" | "translate" | "outline" | "suggestions" | "global"
-const sidePanel = ref<SidePanel>("chat")
+const sidePanel = ref<SidePanel>("score")
 
 let activeIconFlightCleanup: (() => void) | null = null
 let tabSwitchRequestId = 0
@@ -1692,9 +1692,6 @@ function handleFocusOut(event: Event) {
           <div v-show="mainMode === 'ai'" class="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
             <header class="relative shrink-0 border-b border-zinc-200/60 bg-white flex flex-col z-10">
               <nav class="flex items-center overflow-x-auto overflow-y-hidden px-2 md:px-4 py-2.5 md:py-3 gap-1 md:gap-2 w-full scrollbar-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'chat' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('chat')">
-                  <Bot class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">AI 助手</span>
-                </button>
                 <button class="flex-1 flex items-center justify-center gap-1 md:gap-1.5 h-8 md:h-9 rounded-full px-1.5 sm:px-2 md:px-4 text-[11px] sm:text-xs md:text-[14px] font-medium transition-all duration-300 border select-none" :class="sidePanel === 'score' ? 'bg-zinc-900 text-white border-zinc-900 shadow-md' : 'bg-white text-zinc-600 border-zinc-200/80 hover:border-zinc-300 hover:bg-zinc-50 shadow-sm'" @click="switchTab('score')">
                   <ScanLine class="h-3.5 w-3.5 md:h-4 md:w-4 shrink-0" /> <span class="whitespace-nowrap">简历诊断</span>
                 </button>
@@ -1708,8 +1705,7 @@ function handleFocusOut(event: Event) {
             </header>
 
             <div class="relative min-h-0 flex-1 overflow-hidden p-0 md:p-0">
-                <ResumeAiChatPanel v-if="sidePanel === 'chat'" key="chat" v-model:selected-model-id="selectedChatModelId" :chat-models="chatModels" :messages="chatMessages" :current-resume-data="resumeStore.resumeData" :loading="chatLoading" :error="chatError" :decision-loading-id="chatDecisionLoadingId" :active="mainMode === 'ai' && sidePanel === 'chat'" :supports-multimodal="supportsChatImages" @send="sendChatMessage" @regenerate="regenerateChatMessage" @clear="clearChatMessages" @confirm="resolveChatDecision($event, 'apply')" @reject="resolveChatDecision($event, 'reject')" />
-              <ResumeScorePanel v-else-if="sidePanel === 'score'" key="score" :score="score" :loading="scoreLoading" :error="scoreError" :stream-text="scoreStreamText" :is-wide="isWide" @refresh="() => requestFeatureWithPoints('resume_score', refreshScore)" />
+              <ResumeScorePanel v-if="sidePanel === 'score'" key="score" :score="score" :loading="scoreLoading" :error="scoreError" :stream-text="scoreStreamText" :is-wide="isWide" @refresh="() => requestFeatureWithPoints('resume_score', refreshScore)" />
               <JdOptimizeModal v-else-if="sidePanel === 'jd'" key="jd" v-model="jdText" :result="jdResult" :loading="jdLoading" :error="jdError" :stream-text="jdStreamText" :current-data="resumeStore.resumeData" :is-wide="isWide" @optimize="(jd) => requestFeatureWithPoints('jd_optimize', () => optimizeJd(jd))" @apply="applyOptimizeResult({ optimized_resume_data: $event })" @clear="jdResult = null; jdError = ''; jdStreamText = ''" />
               <ResumeTranslatePanel
                 v-else-if="sidePanel === 'translate'"
